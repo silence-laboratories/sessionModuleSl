@@ -37,7 +37,7 @@ const clusterConfig = {
 const THRESHOLD = 2;
 const PARTIES_NUMBER = 3;
 
-export async function createSilenceLabsSigner() {
+export async function createSilenceLabsSigner(): Promise<NetworkSigner> {
 
   const demoWalletPrivateKey = "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393"; // Replace with a demo key
   const browserWallet = new BrowserWallet(demoWalletPrivateKey);
