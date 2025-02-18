@@ -37,7 +37,7 @@ const clusterConfig = {
 const THRESHOLD = 2;
 const PARTIES_NUMBER = 3;
 
-export async function createSilenceLabsSigner(): Promise<NetworkSigner> {
+export async function createSilenceLabsSigner(): Promise<any> {
 
   const demoWalletPrivateKey = "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393"; // Replace with a demo key
   const browserWallet = new BrowserWallet(demoWalletPrivateKey);
@@ -48,10 +48,9 @@ export async function createSilenceLabsSigner(): Promise<NetworkSigner> {
 
   // Generate an ephemeral key for signing.
   const algSign = ["secp256k1"];
-  const ephemeralPrivateKey = generateEphPrivateKey("ed25519");
+  const ephemeralPrivateKey = generateEphPrivateKey("secp256k1");
   const ephemeralPublicKey = getEphPublicKey(ephemeralPrivateKey, "secp256k1");
   const ephId = uuidv4();
-
   // Create an ephemeral key claim with a 1‑hour lifetime.
   const ephClaim = new EphKeyClaim(ephId, ephemeralPublicKey, "secp256k1", 60 * 60);
 
@@ -72,23 +71,23 @@ export async function createSilenceLabsSigner(): Promise<NetworkSigner> {
   const keygenResponse = await networkSigner.generateKey(algSign);
   console.log("Silence Labs keygen response:", keygenResponse);
 
-  return networkSigner;
+  return { networkSigner,keygenResponse};
 }
 
-// Sign a message using the Silence Labs signer.
-export async function signMessageWithSilenceLabs(message : any) {
-  const networkSigner = await createSilenceLabsSigner();
-  const signReq = new SignRequestBuilder()
-    .setRequest(uuidv4(), message, "rawBytes")
-    .build();
+// // Sign a message using the Silence Labs signer.
+// export async function signMessageWithSilenceLabs(message : any) {
+//   const networkSigner = await createSilenceLabsSigner();
+//   const signReq = new SignRequestBuilder()
+//     .setRequest(uuidv4(), message, "rawBytes")
+//     .build();
 
-  const algSign = ["secp256k1"];
-  const keygenResponse = await networkSigner.generateKey(algSign);
-  const primaryKey = keygenResponse[0];
+//   const algSign = ["secp256k1"];
+//   const keygenResponse = await networkSigner.generateKey(algSign);
+//   const primaryKey = keygenResponse[0];
 
-  const [signatureResult] = await networkSigner.signMessage(primaryKey.keyId, "secp256k1", signReq);
-  return signatureResult.sign;
-}
+//   const [signatureResult] = await networkSigner.signMessage(primaryKey.keyId, "secp256k1", signReq);
+//   return signatureResult.sign;
+// }
 
 export function createViemAccount(
     networkSigner: NetworkSigner,
@@ -97,12 +96,15 @@ export function createViemAccount(
     signAlg: string = 'secp256k1',
   ): LocalAccount {
     const address = computeAddress(publicKey);
+    console.log("Address:", address);
     return toAccount({
       address,
       keyId,
       async signMessage({ message }) {
         const signRequest = new SignRequestBuilder().setRequest(address, hashMessage(message), 'EIP191').build();
+        console.log("Sign Request signMessage", signRequest);
         const sign = (await networkSigner.signMessage(keyId, signAlg, signRequest))[0];
+        console.log("Sign:", sign);
         if (sign) {
           const signature = formatViemSign(sign);
           return serializeSignature(signature);
@@ -110,6 +112,7 @@ export function createViemAccount(
         throw new Error('No signature returned from network');
       },
       async signTransaction(transaction, args) {
+        console.log("Sign Transaction", transaction);
         const serializer = args?.serializer || serializeTransaction;
         const signableTransaction = (() => {
           // For EIP-4844 Transactions, we want to sign the transaction payload body (tx_payload_body) without the sidecars (ie. without the network wrapper).
@@ -134,6 +137,7 @@ export function createViemAccount(
         throw new Error('No signature returned from network');
       },
       async signTypedData(typedData) {
+        console.log("Sign Typed Data", typedData);
         const signRequest = new SignRequestBuilder().setRequest(address, hashTypedData(typedData), 'EIP712').build();
         const sign = (await networkSigner.signMessage(keyId, signAlg, signRequest))[0];
         if (sign) {

@@ -24,10 +24,10 @@ export async function createOwnerClient() {
 
 export async function setupMPCSession(ownerClient: any) {
   // Generate MPC keys using Silence Labs
-  const networkSigner = await createSilenceLabsSigner();
-  const keygenResponse = await networkSigner.generateKey(["secp256k1"]);
+  const { networkSigner,keygenResponse } = await createSilenceLabsSigner();
+  // const keygenResponse = await networkSigner.generateKey(["secp256k1"]);
+  // const primaryKey = keygenResponse[0];
   const primaryKey = keygenResponse[0];
-  
   // Create Viem-compatible MPC account
   const mpcAccount = createViemAccount(
     networkSigner,

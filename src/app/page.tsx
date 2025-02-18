@@ -38,7 +38,8 @@ export default function Home() {
         mpcAccount,
         networkSigner
       };
-      
+
+      console.log(sessionInfo);
       
       // Step 4: Grant permissions using session module
       setStep(4);
@@ -60,7 +61,7 @@ export default function Home() {
         }]
       });
 
-      await ownerClient.waitForUserOperationReceipt({ hash: createSessionsResponse.userOpHash });
+      // await ownerClient.waitForUserOperationReceipt({ hash: createSessionsResponse.userOpHash });
       
       localStorage.setItem('mpcSession', JSON.stringify(sessionInfo));
       setSessionData(sessionInfo);
