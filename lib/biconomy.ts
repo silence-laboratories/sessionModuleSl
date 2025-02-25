@@ -7,7 +7,7 @@ import { createSilenceLabsSigner, createViemAccount } from "./sl";
 import { stringify } from "@biconomy/abstractjs";
 
 const COUNTER_ADDRESS = "0xd9145CCE52D386f254917e481eB44e9943F39138";
-const BUNDLER_URL = "https://bundler.biconomy.io/api/v3/11155111/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
+const BUNDLER_URL = "https://paymaster.biconomy.io/api/v1/11155111/J51Gd5gX3.fca10d8b-6619-4ed3-a580-3ce21fc0d717";
 
 export async function createOwnerClient() {
   const ownerAccount = privateKeyToAccount("0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393");
@@ -24,30 +24,27 @@ export async function createOwnerClient() {
 
 export async function setupMPCSession(ownerClient: any) {
   // Generate MPC keys using Silence Labs
-  const { networkSigner,keygenResponse } = await createSilenceLabsSigner();
-  // const keygenResponse = await networkSigner.generateKey(["secp256k1"]);
-  // const primaryKey = keygenResponse[0];
-  const primaryKey = keygenResponse[0];
-  // Create Viem-compatible MPC account
+  const { networkSigner, keygenResponse } = await createSilenceLabsSigner();
+  
+  // Fix: Treat keygenResponse as an object, not an array
+  const primaryKey = keygenResponse; // Changed from keygenResponse[0]
+  console.log("Primary Key:", primaryKey[0].publicKey);
   const mpcAccount = createViemAccount(
     networkSigner,
-    primaryKey.keyId,
-    primaryKey.publicKey,
+    primaryKey[0].keyId,
+    primaryKey[0].publicKey,
     'secp256k1'
   );
 
   // Create session module
   const sessionsModule = (await import("@biconomy/abstractjs")).toSmartSessionsValidator({
     account: ownerClient.account,
-    signer: mpcAccount
+    signer: ownerClient.account.signer
   });
-
+  
   const extendedClient = ownerClient.extend(
     (await import("@biconomy/abstractjs")).smartSessionCreateActions(sessionsModule)
   );
-  // Install module
-  const installHash = await ownerClient.installModule(sessionsModule.moduleInitData);
-  await ownerClient.waitForUserOperationReceipt({ hash: installHash });
 
   return {
     extendedClient,

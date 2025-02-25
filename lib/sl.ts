@@ -38,56 +38,37 @@ const THRESHOLD = 2;
 const PARTIES_NUMBER = 3;
 
 export async function createSilenceLabsSigner(): Promise<any> {
-
-  const demoWalletPrivateKey = "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393"; // Replace with a demo key
+  const demoWalletPrivateKey = "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393";
   const browserWallet = new BrowserWallet(demoWalletPrivateKey);
-  const account = privateKeyToAccount("0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393")
+  const account = privateKeyToAccount("0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393");
+  const ownerAddress = account.address;
 
-
-  const ownerAddress =account.address; 
-
-  // Generate an ephemeral key for signing.
-  const algSign = ["secp256k1"];
-  const ephemeralPrivateKey = generateEphPrivateKey("secp256k1");
-  const ephemeralPublicKey = getEphPublicKey(ephemeralPrivateKey, "secp256k1");
+  // Generate an ephemeral key for signing
+  const algSign = "secp256k1"; // Changed to string for ephemeral key generation
+  const ephemeralPrivateKey = generateEphPrivateKey(algSign);
+  const ephemeralPublicKey = getEphPublicKey(ephemeralPrivateKey, algSign);
   const ephId = uuidv4();
-  // Create an ephemeral key claim with a 1‑hour lifetime.
-  const ephClaim = new EphKeyClaim(ephId, ephemeralPublicKey, "secp256k1", 60 * 60);
+  const ephClaim = new EphKeyClaim(ephId, ephemeralPublicKey, algSign, 60 * 60);
 
-  // Create the EOAAuth instance using the BrowserWallet.
+  // Create the EOAAuth instance using the BrowserWallet
   const eoaAuth = new EOAAuth(ownerAddress, browserWallet, { ephClaim });
 
-  // Create the wallet provider service client.
+  // Create the wallet provider service client
   const walletProviderClient = new WalletProviderServiceClient({
     walletProviderId: "WalletProvider",
     walletProviderUrl: "ws://34.118.117.249",
     apiVersion: "v1",
-});
+  });
 
-  // Create the NetworkSigner instance.
+  // Create the NetworkSigner instance
   const networkSigner = new NetworkSigner(walletProviderClient, THRESHOLD, PARTIES_NUMBER, eoaAuth);
-  
-  // Perform key generation without any permission arguments.
-  const keygenResponse = await networkSigner.generateKey(algSign);
+  const signAlg = "secp256k1";
+  // Perform key generation without permission arguments
+  const keygenResponse = await networkSigner.generateKey([signAlg]); // Changed to remove algSign
   console.log("Silence Labs keygen response:", keygenResponse);
 
-  return { networkSigner,keygenResponse};
+  return { networkSigner, keygenResponse };
 }
-
-// // Sign a message using the Silence Labs signer.
-// export async function signMessageWithSilenceLabs(message : any) {
-//   const networkSigner = await createSilenceLabsSigner();
-//   const signReq = new SignRequestBuilder()
-//     .setRequest(uuidv4(), message, "rawBytes")
-//     .build();
-
-//   const algSign = ["secp256k1"];
-//   const keygenResponse = await networkSigner.generateKey(algSign);
-//   const primaryKey = keygenResponse[0];
-
-//   const [signatureResult] = await networkSigner.signMessage(primaryKey.keyId, "secp256k1", signReq);
-//   return signatureResult.sign;
-// }
 
 export function createViemAccount(
     networkSigner: NetworkSigner,
@@ -95,7 +76,10 @@ export function createViemAccount(
     publicKey: string,
     signAlg: string = 'secp256k1',
   ): LocalAccount {
-    const address = computeAddress(publicKey);
+    
+    const publicKeyHex = `0x${publicKey}`; // Ensure proper hex format
+    const address = publicKeyToAddress(publicKeyHex as `0x${string}`);
+    console.log("Generated MPC Address:", address); // Debug log
     console.log("Address:", address);
     return toAccount({
       address,

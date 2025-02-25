@@ -25,13 +25,16 @@ export default function Home() {
         await setupMPCSession(ownerClient);
 
       // Step 3: Create session data
+      console.log("Primary Key:", primaryKey[0].keyId);
       setStep(3);
+
+      
       const sessionInfo: SessionData = {
         granter: ownerClient.account.address,
         sessionPublicKey: mpcAccount.address,
         description: `Permission to increment counter for ${ownerClient.account.address.slice(0, 6)}`,
         moduleData: {
-          permissionId: primaryKey.keyId,
+          permissionId: extendedClient.permissionId,
           validUntil: Math.floor(Date.now()/1000) + 3600, // 1 hour session
           mode: 'USE' // Add mode
         },
@@ -43,27 +46,26 @@ export default function Home() {
       
       // Step 4: Grant permissions using session module
       setStep(4);
-      const createSessionsResponse = await extendedClient.grantPermission({
-        sessionRequestedInfo: [{
-          sessionPublicKey: mpcAccount.address,
-          actionPoliciesInfo: [{
-            contractAddress: "0xd9145CCE52D386f254917e481eB44e9943F39138",
-            functionSelector: encodeFunctionData({
-              abi: IncrementerABI,
-              functionName: "increment"
-            }).slice(0, 10),
-            rules: [{
-              value: 100,
-              offset: 0,
-              condition: 0
-            }]
-          }]
-        }]
-      });
-
-      // await ownerClient.waitForUserOperationReceipt({ hash: createSessionsResponse.userOpHash });
-      
+      // const createSessionsResponse = await extendedClient.grantPermission({
+      //   sessionRequestedInfo: [{
+      //     sessionPublicKey: mpcAccount.address,
+      //     actionPoliciesInfo: [{
+      //       contractAddress: "0xd9145CCE52D386f254917e481eB44e9943F39138",
+      //       functionSelector: encodeFunctionData({
+      //         abi: IncrementerABI,
+      //         functionName: "increment"
+      //       }).slice(0, 10),
+      //       rules: [{
+      //         value: 100,
+      //         offset: 0,
+      //         condition: 0
+      //       }]
+      //     }]
+      //   }]
+      // });
+      // console.log("Create Sessions Response:", createSessionsResponse);      
       localStorage.setItem('mpcSession', JSON.stringify(sessionInfo));
+
       setSessionData(sessionInfo);
       setStep(5);
 
@@ -77,7 +79,6 @@ export default function Home() {
 
   const sendIncrementTx = async () => {
     if (!sessionData) return;
-    
     setLoading(true);
     try {
       // Step 5: Create session client
