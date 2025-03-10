@@ -7,10 +7,10 @@ import { createSilenceLabsSigner, createViemAccount } from "./sl";
 import { stringify } from "@biconomy/abstractjs";
 
 const COUNTER_ADDRESS = "0xd9145CCE52D386f254917e481eB44e9943F39138";
-const BUNDLER_URL = "https://paymaster.biconomy.io/api/v1/11155111/J51Gd5gX3.fca10d8b-6619-4ed3-a580-3ce21fc0d717";
+const BUNDLER_URL = "https://paymaster.biconomy.io/api/v2/11155111/f3uubFyRm.c7d709d6-0245-47fc-adc6-9dc96fc6155c";
+const ownerAccount = privateKeyToAccount("0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393");
 
-export async function createOwnerClient() {
-  const ownerAccount = privateKeyToAccount("0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393");
+export async function createNexusClient() {
   
   return createSmartAccountClient({
     account: await toNexusAccount({
@@ -37,43 +37,51 @@ export async function setupMPCSession(ownerClient: any) {
   );
 
   // Create session module
+  const nexusClient = await createNexusClient();
   const sessionsModule = (await import("@biconomy/abstractjs")).toSmartSessionsValidator({
-    account: ownerClient.account,
-    signer: ownerClient.account.signer
+    account: nexusClient.account,
+    signer: ownerAccount
   });
+  const hash = await nexusClient.installModule({
+    module: sessionsModule.moduleInitData
+  })
+  const { success: installSuccess } = await nexusClient.waitForUserOperationReceipt({ hash })
   
-  const extendedClient = ownerClient.extend(
+  const extendedSessionClient = ownerClient.extend(
     (await import("@biconomy/abstractjs")).smartSessionCreateActions(sessionsModule)
   );
-
   return {
-    extendedClient,
+    extendedSessionClient,
     mpcAccount,
     networkSigner,
     primaryKey
   };
 }
 // lib/biconomy.ts update
-export async function createSessionClient(sessionData: any) { // Remove ownerClient parameter
+export async function createSessionClient(sessionData: SessionData) {
   const client = createSmartAccountClient({
     account: await toNexusAccount({
       signer: sessionData.mpcAccount,
-      chain: sepolia,
+      chain: sepolia, // Consistent chain
       transport: http(),
     }),
     transport: http(BUNDLER_URL)
   });
 
-  const useModule = (await import("@biconomy/abstractjs")).toSmartSessionsValidator({
-    account: client.account,
-    signer: sessionData.mpcAccount,
-    moduleData: sessionData.moduleData
-  });
+  // const useModule = (await import("@biconomy/abstractjs")).toSmartSessionsValidator({
+  //   account: client.account,
+  //   signer: sessionData.mpcAccount,
+  //   moduleData: {
+  //     permissionIds: sessionData.moduleData.permissionId,
+  //     mode: sessionData.moduleData.mode as `0x${string}`
+  //   }
+  // });
 
-  return client.extend(
-    (await import("@biconomy/abstractjs")).smartSessionUseActions(useModule)
-  );
+  // return client.extend(
+  //   (await import("@biconomy/abstractjs")).smartSessionUseActions(useModule)
+  // );
 }
+
 //create session data type
 export interface SessionData {
   granter: string;

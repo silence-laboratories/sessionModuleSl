@@ -1,176 +1,213 @@
-"use client"
-import { useState } from "react";
-import { encodeFunctionData } from "viem";
-import { createOwnerClient, setupMPCSession, createSessionClient, type SessionData } from "../../lib/biconomy";
-import IncrementerABI from "../../contracts/ABI.json";
-import styles from "./page.module.css";
+// app/page.tsx
+"use client";
+import { useState } from 'react';
+import { createSmartAccountClient, toNexusAccount, smartSessionCreateActions, toSmartSessionsValidator, smartSessionUseActions, stringify, parse, SmartSessionMode, CreateSessionDataParams } from "@biconomy/abstractjs";
+import { baseSepolia } from "viem/chains";
+import { http, encodeFunctionData, Hash } from "viem";
+import { createSilenceLabsSigner, createViemAccount } from '../../lib/sl';
+import abi from './../../contracts/ABI.json'; // Import your Counter ABI
+import { privateKeyToAccount } from 'viem/accounts';
 
-export default function Home() {
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState(0);
-  const [sessionData, setSessionData] = useState<SessionData | null>(null);
+export default function SessionPage() {
+  const [mpcSigner, setMpcSigner] = useState<any>(null);
+  const [sessionData, setSessionData] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string>('');
+  const [txHash, setTxHash] = useState<string>('');
 
-  const initializeSession = async () => {
-    setLoading(true);
+  // Initialize MPC Signer
+  const initializeMPCSigner = async () => {
+    setLoading('Initializing MPC signer...');
     try {
-      // Step 1: Create owner client
-      setStep(1);
-      const ownerClient = await createOwnerClient();
-
-      // Step 2: Setup MPC Session
-      setStep(2);
-      const { extendedClient, mpcAccount, networkSigner, primaryKey } = 
-        await setupMPCSession(ownerClient);
-
-      // Step 3: Create session data
-      console.log("Primary Key:", primaryKey[0].keyId);
-      setStep(3);
-
-      
-      const sessionInfo: SessionData = {
-        granter: ownerClient.account.address,
-        sessionPublicKey: mpcAccount.address,
-        description: `Permission to increment counter for ${ownerClient.account.address.slice(0, 6)}`,
-        moduleData: {
-          permissionId: extendedClient.permissionId,
-          validUntil: Math.floor(Date.now()/1000) + 3600, // 1 hour session
-          mode: 'USE' // Add mode
-        },
-        mpcAccount,
-        networkSigner
-      };
-
-      console.log(sessionInfo);
-      
-      // Step 4: Grant permissions using session module
-      setStep(4);
-      // const createSessionsResponse = await extendedClient.grantPermission({
-      //   sessionRequestedInfo: [{
-      //     sessionPublicKey: mpcAccount.address,
-      //     actionPoliciesInfo: [{
-      //       contractAddress: "0xd9145CCE52D386f254917e481eB44e9943F39138",
-      //       functionSelector: encodeFunctionData({
-      //         abi: IncrementerABI,
-      //         functionName: "increment"
-      //       }).slice(0, 10),
-      //       rules: [{
-      //         value: 100,
-      //         offset: 0,
-      //         condition: 0
-      //       }]
-      //     }]
-      //   }]
-      // });
-      // console.log("Create Sessions Response:", createSessionsResponse);      
-      localStorage.setItem('mpcSession', JSON.stringify(sessionInfo));
-
-      setSessionData(sessionInfo);
-      setStep(5);
-
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
+      const { networkSigner, keygenResponse } = await createSilenceLabsSigner();
+      const mpcAccount = createViemAccount(
+        networkSigner,
+        keygenResponse.keyId,
+        keygenResponse.publicKey
+      );
+      setMpcSigner(mpcAccount);
+      setLoading('');
+    } catch (error) {
+      console.error('MPC Signer Error:', error);
+      setLoading('');
     }
   };
 
-  const sendIncrementTx = async () => {
-    if (!sessionData) return;
-    setLoading(true);
+  // Create Biconomy Smart Session
+  const createSmartSession = async () => {
+    if (!mpcSigner) return;
+    setLoading('Creating smart session...');
+
     try {
-      // Step 5: Create session client
-      setStep(5);
-      const sessionClient = await createSessionClient(sessionData);
+      // Initialize Nexus client with owner account
+      const ownerPrivateKey = "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393"; // Replace with actual owner key
+      const ownerAccount = privateKeyToAccount(ownerPrivateKey);
       
-      // Step 6: Execute transaction
-      setStep(6);
-      const userOpHash = await sessionClient.usePermission({
+      const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
+      
+      const nexusClient = await createSmartAccountClient({
+        account: await toNexusAccount({
+          signer: ownerAccount,
+          chain: baseSepolia,
+          transport: http(),
+        }),
+        transport: http(bundlerUrl),
+      });
+
+      // Create and install sessions module
+      const sessionsModule = toSmartSessionsValidator({
+        account: nexusClient.account,
+        signer: ownerAccount
+      });
+
+      const hash = await nexusClient.installModule({
+        module: sessionsModule.moduleInitData
+      });
+      console.log("Module Installation Hash:", hash);
+      
+      await nexusClient.waitForUserOperationReceipt({ hash });
+
+      const nexusSessionClient = nexusClient.extend(smartSessionCreateActions(sessionsModule));
+
+      // Create session with MPC public key
+      const sessionRequestedInfo: CreateSessionDataParams[] = [
+        {
+          sessionKeyData: mpcSigner.address as `0x${string}`, // Use sessionKeyData instead of sessionPublicKey
+          actionPoliciesInfo: [{
+            contractAddress: "0xYOUR_CONTRACT_ADDRESS" as `0x${string}`,
+            rules: [],
+            functionSelector: "0x273ea3e3" as `0x${string}` // Function selector for 'incrementNumber'
+          }]
+        }
+      ];
+      console.log("sessionRequestedInfo:", sessionRequestedInfo);
+
+      const createSessionsResponse = await nexusSessionClient.grantPermission({
+        sessionRequestedInfo
+      });
+
+      await nexusClient.waitForUserOperationReceipt({
+        hash: createSessionsResponse.userOpHash
+      });
+
+      // Store session data
+      const sessionDataObj = {
+        granter: nexusClient.account.address,
+        sessionPublicKey: mpcSigner.address,
+        description: `MPC Session for ${nexusClient.account.address.slice(0, 6)}`,
+        moduleData: {
+          ...createSessionsResponse,
+          mode: SmartSessionMode.USE
+        }
+      };
+
+      const compressedData = stringify(sessionDataObj);
+      localStorage.setItem('mpcSessionData', compressedData);
+      setSessionData(compressedData);
+      setLoading('');
+    } catch (error) {
+      console.error('Session Creation Error:', error);
+      setLoading('');
+    }
+  };
+
+  // Execute Transaction with MPC Session
+  const executeTransaction = async () => {
+    if (!sessionData) return;
+    setLoading('Executing transaction...');
+
+    try {
+      const parsedData = parse(sessionData);
+      const bundlerUrl = "YOUR_BICONOMY_BUNDLER_URL";
+      
+      // Create MPC-powered client
+      const smartSessionClient = createSmartAccountClient({
+        chain: baseSepolia,
+        account: await toNexusAccount({
+          signer: mpcSigner,
+          chain: baseSepolia,
+          transport: http(),
+        }),
+        transport: http(bundlerUrl)
+      });
+
+      // Attach sessions module
+      const usePermissionsModule = toSmartSessionsValidator({
+        account: smartSessionClient.account,
+        signer: mpcSigner,
+        moduleData: parsedData.moduleData
+      });
+
+      const sessionEnabledClient = smartSessionClient.extend(
+        smartSessionUseActions(usePermissionsModule)
+      );
+
+      // Execute transaction
+      const userOpHash = await sessionEnabledClient.usePermission({
         calls: [{
-          to: "0xd9145CCE52D386f254917e481eB44e9943F39138",
+          to: "0xYOUR_CONTRACT_ADDRESS",
           data: encodeFunctionData({
-            abi: IncrementerABI,
-            functionName: "increment"
+            abi: abi,
+            functionName: "incrementNumber"
           })
         }]
       });
 
       setTxHash(userOpHash);
-      setStep(7);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Transaction failed");
-    } finally {
-      setLoading(false);
+      setLoading('');
+    } catch (error) {
+      console.error('Execution Error:', error);
+      setLoading('');
     }
   };
 
-  const getStepStatus = (stepNum: number) => {
-    if (loading && step === stepNum) return "⏳";
-    if (step >= stepNum) return "✅";
-    return "⭕";
-  };
-
   return (
-    <main className={styles.container}>
-      <div className={styles.card}>
-        <h1>MPC Session Demo</h1>
-        
-        <div className={styles.steps}>
-          <h3>Initialization</h3>
-          <div className={styles.stepList}>
-            <div className={`${styles.step} ${step >= 1 ? styles.completed : ''} ${loading && step === 1 ? styles.loading : ''}`}>
-              <span className={styles.stepIcon}>{getStepStatus(1)}</span>
-              <span>Create Owner Client</span>
-            </div>
-            <div className={`${styles.step} ${step >= 2 ? styles.completed : ''} ${loading && step === 2 ? styles.loading : ''}`}>
-              <span className={styles.stepIcon}>{getStepStatus(2)}</span>
-              <span>Setup MPC Session</span>
-            </div>
-            <div className={`${styles.step} ${step >= 3 ? styles.completed : ''} ${loading && step === 3 ? styles.loading : ''}`}>
-              <span className={styles.stepIcon}>{getStepStatus(3)}</span>
-              <span>Store Session Data</span>
-            </div>
-            <div className={`${styles.step} ${step >= 4 ? styles.completed : ''} ${loading && step === 4 ? styles.loading : ''}`}>
-              <span className={styles.stepIcon}>{getStepStatus(4)}</span>
-              <span>Grant Permissions</span>
-            </div>
-          </div>
+    <div className="min-h-screen p-8">
+      <h1 className="text-3xl mb-8">MPC-Powered Smart Sessions</h1>
+      
+      <div className="space-y-4 max-w-2xl">
+        <button
+          onClick={initializeMPCSigner}
+          className="btn-primary"
+          disabled={!!mpcSigner}
+        >
+          {mpcSigner ? 'MPC Signer Ready' : 'Initialize MPC Signer'}
+        </button>
 
-          <h3>Transaction</h3>
-          <div className={styles.stepList}>
-            <div className={`${styles.step} ${step >= 5 ? styles.completed : ''} ${loading && step === 5 ? styles.loading : ''}`}>
-              <span className={styles.stepIcon}>{getStepStatus(5)}</span>
-              <span>Initialize Session Client</span>
-            </div>
-            <div className={`${styles.step} ${step >= 6 ? styles.completed : ''} ${loading && step === 6 ? styles.loading : ''}`}>
-              <span className={styles.stepIcon}>{getStepStatus(6)}</span>
-              <span>Send Increment TX</span>
-            </div>
-          </div>
-        </div>
+        {mpcSigner && (
+          <button
+            onClick={createSmartSession}
+            className="btn-secondary"
+            disabled={!!sessionData}
+          >
+            {sessionData ? 'Session Created' : 'Create Smart Session'}
+          </button>
+        )}
 
-        <div className={styles.actions}>
-          {!sessionData ? (
-            <button className={styles.button} onClick={initializeSession} disabled={loading}>
-              {loading ? "Initializing..." : "Start Session"}
-            </button>
-          ) : (
-            <button className={styles.button} onClick={sendIncrementTx} disabled={loading}>
-              {loading ? "Processing..." : "Increment Counter"}
-            </button>
-          )}
-        </div>
+        {sessionData && (
+          <button
+            onClick={executeTransaction}
+            className="btn-success"
+          >
+            Execute Transaction
+          </button>
+        )}
 
-        {error && <div className={styles.error}>{error}</div>}
+        {loading && <p className="text-blue-500">{loading}</p>}
         {txHash && (
-          <div className={styles.success}>
-            Transaction Hash: <code>{txHash}</code>
+          <div className="mt-4 p-4 bg-gray-100 rounded">
+            <p className="font-mono break-words">Transaction Hash: {txHash}</p>
           </div>
         )}
+
+        <div className="mt-8 space-y-2">
+          {mpcSigner && (
+            <p>MPC Signer Address: {mpcSigner.address}</p>
+          )}
+          {sessionData && (
+            <p>Session Granter: {parse(sessionData).granter}</p>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
