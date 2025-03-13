@@ -1,29 +1,39 @@
 // app/page.tsx
 "use client";
 import { useState } from 'react';
-import { createSmartAccountClient, toNexusAccount, smartSessionCreateActions, toSmartSessionsValidator, smartSessionUseActions, stringify, parse, SmartSessionMode, CreateSessionDataParams } from "@biconomy/abstractjs";
+import {
+  createSmartAccountClient,
+  toNexusAccount,
+  smartSessionCreateActions,
+  toSmartSessionsValidator,
+  smartSessionUseActions,
+  stringify,
+  parse,
+  SmartSessionMode,
+  CreateSessionDataParams,
+} from "@biconomy/abstractjs";
 import { baseSepolia } from "viem/chains";
-import { http, encodeFunctionData, Hash } from "viem";
-import { createSilenceLabsSigner, createViemAccount } from '../../lib/sl';
-import abi from './../../contracts/ABI.json'; // Import your Counter ABI
+import { http, encodeFunctionData } from "viem";
+import { createViemAccount, generateCryptographicKey, createSignerForSign } from '../../lib/sl';
+import abi from './../../contracts/ABI.json';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ethers } from 'ethers';
+
 export default function SessionPage() {
   const [mpcSigner, setMpcSigner] = useState<any>(null);
   const [sessionData, setSessionData] = useState<string | null>(null);
   const [loading, setLoading] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
 
-  // Initialize MPC Signer
+  // Initialize MPC Signer: generate keys (if needed) and then create the signer for signing
   const initializeMPCSigner = async () => {
     setLoading('Initializing MPC signer...');
     try {
-      const { networkSigner, keygenResponse } = await createSilenceLabsSigner();
-      const mpcAccount = createViemAccount(
-        networkSigner,
-        String(keygenResponse[0].keyId),
-        keygenResponse[0].publicKey
-      );
+      // Generate key pair (this will store config in localStorage)
+      await generateCryptographicKey();
+      // Create a NetworkSigner using EphAuth for signing operations
+      const { networkSigner, keyId, publicKey } = await createSignerForSign();
+      const mpcAccount = createViemAccount(networkSigner, keyId, publicKey);
       setMpcSigner(mpcAccount);
       setLoading('');
     } catch (error) {
@@ -39,24 +49,12 @@ export default function SessionPage() {
 
     try {
       // Initialize Nexus client with owner account
-
-      // const generateRandomPrivateKey = () => {
-      //   return `0x${Math.random().toString(16).slice(2)}`;
-      // }
-      //generate random provate key using viem
-      const generateRandomPrivateKey = () => {
-        const wallet = ethers.Wallet.createRandom();
-        const privateKey = wallet.privateKey;
-        console.log("account",privateKey);
-        return ;
-      }
-      console.log("private key",generateRandomPrivateKey());
-
       const ownerPrivateKey = "0xec2387b319f9c96c5f2a3f9f5152208d09c0265d139235cab9c90511e6836fc7"; // Replace with actual owner key
       const ownerAccount = privateKeyToAccount(ownerPrivateKey);
-      
+
       const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
-      
+      const ownerAccountAddress = ownerAccount.address;
+      console.log("Owner Account:", ownerAccountAddress);
       const nexusClient = await createSmartAccountClient({
         account: await toNexusAccount({
           signer: ownerAccount,
@@ -78,7 +76,7 @@ export default function SessionPage() {
         module: sessionsModule.moduleInitData
       });
       console.log("Module Installation Hash:", hash);
-      
+
       await nexusClient.waitForUserOperationReceipt({ hash });
 
       const nexusSessionClient = nexusClient.extend(smartSessionCreateActions(sessionsModule));
@@ -86,11 +84,11 @@ export default function SessionPage() {
       // Create session with MPC public key
       const sessionRequestedInfo: CreateSessionDataParams[] = [
         {
-          sessionKeyData: mpcSigner.address as `0x${string}`, // Use sessionKeyData instead of sessionPublicKey
+          sessionKeyData: mpcSigner.address as `0x${string}`,
           actionPoliciesInfo: [{
             contractAddress: "0x7961d826258946969fa0d80b34508094c6148bdf" as `0x${string}`,
             rules: [],
-            functionSelector: "0xd09de08a" as `0x${string}` // Function selector for 'incrementNumber'
+            functionSelector: "0xd09de08a" as `0x${string}` // Function selector for 'increment'
           }]
         }
       ];
@@ -104,7 +102,7 @@ export default function SessionPage() {
         hash: createSessionsResponse.userOpHash
       });
 
-      // Store session data
+      // Store session data in localStorage for persistence
       const sessionDataObj = {
         granter: nexusClient.account.address,
         sessionPublicKey: mpcSigner.address,
@@ -133,8 +131,9 @@ export default function SessionPage() {
     try {
       const parsedData = parse(sessionData);
       const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
-      
+
       // Create MPC-powered client
+      console.log("Creating MPC-powered client...");
       const smartSessionClient = createSmartAccountClient({
         chain: baseSepolia,
         account: await toNexusAccount({
@@ -146,6 +145,7 @@ export default function SessionPage() {
       });
 
       // Attach sessions module
+      console.log("Attaching sessions module...");
       const usePermissionsModule = toSmartSessionsValidator({
         account: smartSessionClient.account,
         signer: mpcSigner,
@@ -156,7 +156,8 @@ export default function SessionPage() {
         smartSessionUseActions(usePermissionsModule)
       );
 
-      // Execute transaction
+      // Execute transaction (example: calling 'increment')
+      console.log("Executing transaction...");
       const userOpHash = await sessionEnabledClient.usePermission({
         calls: [{
           to: "0x7961d826258946969fa0d80b34508094c6148bdf",
@@ -165,9 +166,10 @@ export default function SessionPage() {
             functionName: "increment"
           })
         }],
-        callGasLimit: BigInt(100_000), // Example value
-        verificationGasLimit:BigInt(50000),
-        preVerificationGas: BigInt(50000),
+        callGasLimit: BigInt(100000),
+        verificationGasLimit: BigInt(500000),
+        preVerificationGas: BigInt(300000)
+
       });
 
       setTxHash(userOpHash);
@@ -181,7 +183,7 @@ export default function SessionPage() {
   return (
     <div className="min-h-screen p-8">
       <h1 className="text-3xl mb-8">MPC-Powered Smart Sessions</h1>
-      
+
       <div className="space-y-4 max-w-2xl">
         <button
           onClick={initializeMPCSigner}
