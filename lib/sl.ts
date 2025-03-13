@@ -4,12 +4,14 @@ import { LocalAccount, privateKeyToAccount, publicKeyToAddress, toAccount } from
 import { secp256k1 } from '@noble/curves/secp256k1';
 import {
     Address,
+    bytesToHex,
     hashMessage,
     hashTypedData,
     keccak256,
     serializeSignature,
     serializeTransaction,
     Signature,
+    stringToHex,
     toHex,
   } from 'viem';
   import { Base64 } from 'js-base64';
@@ -65,6 +67,7 @@ export async function createSilenceLabsSigner(): Promise<any> {
   const signAlg = "secp256k1";
   // Perform key generation without permission arguments
   const keygenResponse = await networkSigner.generateKey([signAlg]); // Changed to remove algSign
+  keygenResponse[0].keyId = String(keygenResponse[0].keyId);
   console.log("Silence Labs keygen response:", keygenResponse);
 
   return { networkSigner, keygenResponse };
@@ -85,8 +88,25 @@ export function createViemAccount(
       address,
       keyId,
       async signMessage({ message }) {
-        const signRequest = new SignRequestBuilder().setRequest(address, hashMessage(message), 'EIP191').build();
+        console.log("signMessage",message)
+        message = (() => {
+          if (typeof message === "string") {
+            return stringToHex(message);
+          }
+          if (typeof message.raw === "string") {
+            return message.raw;
+          }
+          return bytesToHex(message.raw);
+        })();
+        if(message.slice(0,2) === "0x"){
+          message = message.slice(2);
+        }
+        console.log("signMessage112",message)
+        const signRequest = new SignRequestBuilder()
+        .setRequest(uuidv4(), message, "rawBytes")
+        .build();        
         console.log("Sign Request signMessage", signRequest);
+        console.log("network signer",networkSigner)
         const sign = (await networkSigner.signMessage(keyId, signAlg, signRequest))[0];
         console.log("Sign:", sign);
         if (sign) {

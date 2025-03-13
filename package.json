@@ -12,6 +12,7 @@
     "@biconomy/abstractjs": "^0.0.38",
     "@rhinestone/module-sdk": "^0.2.3",
     "@silencelaboratories/walletprovider-sdk": "^0.4.1",
+    "ethers": "^6.13.5",
     "next": "15.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

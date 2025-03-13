@@ -7,7 +7,7 @@ import { http, encodeFunctionData, Hash } from "viem";
 import { createSilenceLabsSigner, createViemAccount } from '../../lib/sl';
 import abi from './../../contracts/ABI.json'; // Import your Counter ABI
 import { privateKeyToAccount } from 'viem/accounts';
-
+import { ethers } from 'ethers';
 export default function SessionPage() {
   const [mpcSigner, setMpcSigner] = useState<any>(null);
   const [sessionData, setSessionData] = useState<string | null>(null);
@@ -21,8 +21,8 @@ export default function SessionPage() {
       const { networkSigner, keygenResponse } = await createSilenceLabsSigner();
       const mpcAccount = createViemAccount(
         networkSigner,
-        keygenResponse.keyId,
-        keygenResponse.publicKey
+        String(keygenResponse[0].keyId),
+        keygenResponse[0].publicKey
       );
       setMpcSigner(mpcAccount);
       setLoading('');
@@ -39,7 +39,20 @@ export default function SessionPage() {
 
     try {
       // Initialize Nexus client with owner account
-      const ownerPrivateKey = "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393"; // Replace with actual owner key
+
+      // const generateRandomPrivateKey = () => {
+      //   return `0x${Math.random().toString(16).slice(2)}`;
+      // }
+      //generate random provate key using viem
+      const generateRandomPrivateKey = () => {
+        const wallet = ethers.Wallet.createRandom();
+        const privateKey = wallet.privateKey;
+        console.log("account",privateKey);
+        return ;
+      }
+      console.log("private key",generateRandomPrivateKey());
+
+      const ownerPrivateKey = "0xec2387b319f9c96c5f2a3f9f5152208d09c0265d139235cab9c90511e6836fc7"; // Replace with actual owner key
       const ownerAccount = privateKeyToAccount(ownerPrivateKey);
       
       const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
@@ -52,12 +65,14 @@ export default function SessionPage() {
         }),
         transport: http(bundlerUrl),
       });
+      console.log("Nexus Client:", nexusClient.account.address);
 
       // Create and install sessions module
       const sessionsModule = toSmartSessionsValidator({
         account: nexusClient.account,
         signer: ownerAccount
       });
+      console.log("Sessions Module:", sessionsModule.moduleInitData);
 
       const hash = await nexusClient.installModule({
         module: sessionsModule.moduleInitData
@@ -73,9 +88,9 @@ export default function SessionPage() {
         {
           sessionKeyData: mpcSigner.address as `0x${string}`, // Use sessionKeyData instead of sessionPublicKey
           actionPoliciesInfo: [{
-            contractAddress: "0xYOUR_CONTRACT_ADDRESS" as `0x${string}`,
+            contractAddress: "0x7961d826258946969fa0d80b34508094c6148bdf" as `0x${string}`,
             rules: [],
-            functionSelector: "0x273ea3e3" as `0x${string}` // Function selector for 'incrementNumber'
+            functionSelector: "0xd09de08a" as `0x${string}` // Function selector for 'incrementNumber'
           }]
         }
       ];
@@ -117,7 +132,7 @@ export default function SessionPage() {
 
     try {
       const parsedData = parse(sessionData);
-      const bundlerUrl = "YOUR_BICONOMY_BUNDLER_URL";
+      const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
       
       // Create MPC-powered client
       const smartSessionClient = createSmartAccountClient({
@@ -144,12 +159,15 @@ export default function SessionPage() {
       // Execute transaction
       const userOpHash = await sessionEnabledClient.usePermission({
         calls: [{
-          to: "0xYOUR_CONTRACT_ADDRESS",
+          to: "0x7961d826258946969fa0d80b34508094c6148bdf",
           data: encodeFunctionData({
             abi: abi,
-            functionName: "incrementNumber"
+            functionName: "increment"
           })
-        }]
+        }],
+        callGasLimit: BigInt(100_000), // Example value
+        verificationGasLimit:BigInt(50000),
+        preVerificationGas: BigInt(50000),
       });
 
       setTxHash(userOpHash);
