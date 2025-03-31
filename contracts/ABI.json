@@ -1,35 +1,33 @@
 [
 	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "newCounter",
-				"type": "uint256"
-			}
-		],
-		"name": "Incremented",
-		"type": "event"
+	  "type": "event",
+	  "anonymous": false,
+	  "name": "Incremented",
+	  "inputs": [
+		{
+		  "indexed": false,
+		  "name": "newCounter",
+		  "type": "uint256"
+		}
+	  ]
 	},
 	{
-		"inputs": [],
-		"name": "counter",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
+	  "type": "function",
+	  "name": "counter",
+	  "stateMutability": "view",
+	  "inputs": [],
+	  "outputs": [
+		{
+		  "name": "",
+		  "type": "uint256"
+		}
+	  ]
 	},
 	{
-		"inputs": [],
-		"name": "increment",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
+	  "type": "function",
+	  "name": "increment",
+	  "stateMutability": "nonpayable",
+	  "inputs": [],
+	  "outputs": []
 	}
-]
+  ]

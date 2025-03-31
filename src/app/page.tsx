@@ -13,11 +13,49 @@ import {
   CreateSessionDataParams,
 } from "@biconomy/abstractjs";
 import { baseSepolia } from "viem/chains";
-import { http, encodeFunctionData } from "viem";
+import { http, encodeFunctionData, Abi } from "viem";
 import { createViemAccount, generateCryptographicKey, createSignerForSign } from '../../lib/sl';
 import abi from './../../contracts/ABI.json';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ethers } from 'ethers';
+
+
+
+const CounterAbi = [
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newCounter",
+				"type": "uint256"
+			}
+		],
+		"name": "Incremented",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "counter",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "increment",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+] as const satisfies Abi;
 
 export default function SessionPage() {
   const [mpcSigner, setMpcSigner] = useState<any>(null);
@@ -49,7 +87,7 @@ export default function SessionPage() {
 
     try {
       // Initialize Nexus client with owner account
-      const ownerPrivateKey = "0xec2387b319f9c96c5f2a3f9f5152208d09c0265d139235cab9c90511e6836fc7"; // Replace with actual owner key
+      const ownerPrivateKey = "0x1439f4ea306e7a2ed953a1f7e948614c2b3a8d62ae034b50d9b4ba3f51124c03"; // Replace with actual owner key
       const ownerAccount = privateKeyToAccount(ownerPrivateKey);
 
       const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
@@ -77,43 +115,61 @@ export default function SessionPage() {
       });
       console.log("Module Installation Hash:", hash);
 
-      await nexusClient.waitForUserOperationReceipt({ hash });
+      
+    const { success: installSuccess } = await nexusClient.waitForUserOperationReceipt({ hash });
+
+    if (!installSuccess) {
+        console.error("❌ Failed to install Smart Sessions module");
+        return;
+    }
+
+    console.log("✅ Smart Sessions module installed successfully");
 
       const nexusSessionClient = nexusClient.extend(smartSessionCreateActions(sessionsModule));
 
       // Create session with MPC public key
+      // In createSmartSession()
       const sessionRequestedInfo: CreateSessionDataParams[] = [
         {
-          sessionKeyData: mpcSigner.address as `0x${string}`,
+          sessionPublicKey: mpcSigner.address as `0x${string}`, // ✅ Correct property
           actionPoliciesInfo: [{
             contractAddress: "0x7961d826258946969fa0d80b34508094c6148bdf" as `0x${string}`,
-            rules: [],
-            functionSelector: "0xd09de08a" as `0x${string}` // Function selector for 'increment'
+            abi : CounterAbi,
+            sudo: true 
           }]
         }
       ];
       console.log("sessionRequestedInfo:", sessionRequestedInfo);
+      console.log("MPC Session Public Key:", mpcSigner.address);
+      console.log("Session Public Key in Policy:", sessionRequestedInfo[0].sessionPublicKey);
 
       const createSessionsResponse = await nexusSessionClient.grantPermission({
         sessionRequestedInfo
       });
-
-      await nexusClient.waitForUserOperationReceipt({
+      const { success } = await nexusClient.waitForUserOperationReceipt({
         hash: createSessionsResponse.userOpHash
-      });
+    });
+
+    if (!success) {
+        console.error("❌ Failed to create Smart Session");
+        return;
+    }
+
+    console.log("✅ Smart Session created successfully");
 
       // Store session data in localStorage for persistence
-      const sessionDataObj = {
+      const sessionData = {
         granter: nexusClient.account.address,
         sessionPublicKey: mpcSigner.address,
-        description: `MPC Session for ${nexusClient.account.address.slice(0, 6)}`,
         moduleData: {
-          ...createSessionsResponse,
-          mode: SmartSessionMode.USE
+          permissionIds: createSessionsResponse.permissionIds, // ✅ Ensure these are included
+          action: createSessionsResponse.action,
+          mode: SmartSessionMode.USE,
+          sessions: createSessionsResponse.sessions
         }
       };
 
-      const compressedData = stringify(sessionDataObj);
+      const compressedData = stringify(sessionData);
       localStorage.setItem('mpcSessionData', compressedData);
       setSessionData(compressedData);
       setLoading('');
@@ -137,6 +193,7 @@ export default function SessionPage() {
       const smartSessionClient = createSmartAccountClient({
         chain: baseSepolia,
         account: await toNexusAccount({
+          accountAddress: parsedData.granter,
           signer: mpcSigner,
           chain: baseSepolia,
           transport: http(),
@@ -162,13 +219,10 @@ export default function SessionPage() {
         calls: [{
           to: "0x7961d826258946969fa0d80b34508094c6148bdf",
           data: encodeFunctionData({
-            abi: abi,
+            abi: CounterAbi,
             functionName: "increment"
           })
-        }],
-        callGasLimit: BigInt(100000),
-        verificationGasLimit: BigInt(500000),
-        preVerificationGas: BigInt(300000)
+        }]
 
       });
 
