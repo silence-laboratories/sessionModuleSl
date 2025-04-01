@@ -75,7 +75,7 @@ function hexToBytesNo0x(hex: string): Uint8Array {
 /**
  * generateCryptographicKey()
  * 1) EOAAuth with a local "demo" private key (for simplicity).
- * 2) Silence Labs keygen => store KeyConfiguration in localStorage.
+ * 2) Silence Labs keygen => store KeyConfiguration in localStorage.
  */
 export async function generateCryptographicKey(): Promise<{
   keyConfig: KeyConfiguration;
@@ -166,7 +166,7 @@ export function createViemAccount(
   signAlg = "secp256k1"
 ): LocalAccount {
   const pubHex = `0x${publicKey}` as `0x${string}`;
-  const address = publicKeyToAddress(pubHex);
+  const address = computeAddress(publicKey)
   console.log("MPC Address =>", address);
 
   return toAccount({
@@ -177,16 +177,21 @@ export function createViemAccount(
       console.log("MPC signMessage:", message);
 
       const hexMsg = normalizeToHex(message);
-      // "rawBytes" = no personal_sign prefix or EIP191. We sign exactly those 32 bytes.
       const signReq = new SignRequestBuilder()
-        .setRequest(uuidv4(), hexMsg.slice(2), "rawBytes")
+        .setRequest(uuidv4(), hexMsg, "EIP191")
         .build();
 
       const [resp] = await networkSigner.signMessage(keyId, signAlg, signReq);
       if (!resp) throw new Error("Silence Labs returned empty signature.");
 
-      const sig = formatViemSign(resp);
-      return serializeSignature(sig);
+      const flattenSignature = (signgenResponse: SignResponse): `0x${string}` => {
+        const { sign, recid } = signgenResponse;
+        const recid_hex = (27 + recid).toString(16);
+        return `0x${sign}${recid_hex}`;
+      };
+    
+      const res = flattenSignature(resp)
+      return res;
     },
 
     // B) signTransaction: same approach -> raw ecdsa of keccak(rlp)
