@@ -181,7 +181,7 @@ export function createViemAccount(
       const signReq = new SignRequestBuilder()
         .setRequest(uuidv4(), hexMsg.slice(2), "rawBytes")
         .build();
-
+      
       const [resp] = await networkSigner.signMessage(keyId, signAlg, signReq);
       if (!resp) throw new Error("Silence Labs returned empty signature.");
 

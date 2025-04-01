@@ -40,3 +40,15 @@ a {
     color-scheme: dark;
   }
 }
+
+/* globals.css or styles.css */
+.bg-animated-gradient {
+  background: linear-gradient(-45deg, #6933ff, #00c9ff, #ff2e63, #ff9966);
+  background-size: 400% 400%;
+  animation: gradientBG 8s ease infinite; /* uses keyframes.gradientBG from tailwind.config */
+}
+
+/* Simple spinner for loading */
+.loader {
+  border-top-color: #ffffff;
+}
