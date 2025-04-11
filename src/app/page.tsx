@@ -1,75 +1,44 @@
-// app/page.tsx
 "use client";
 import { useState } from 'react';
 import {
   createSmartAccountClient,
   toNexusAccount,
-  smartSessionCreateActions,
-  toSmartSessionsValidator,
-  smartSessionUseActions,
-  stringify,
-  parse,
-  SmartSessionMode,
-  CreateSessionDataParams,
+  smartSessionActions,
+  toSmartSessionsModule,
+  getSudoPolicy,
 } from "@biconomy/abstractjs";
 import { baseSepolia } from "viem/chains";
-import { http, encodeFunctionData, Abi } from "viem";
-import { createViemAccount, generateCryptographicKey, createSignerForSign } from '../../lib/sl';
-import abi from './../../contracts/ABI.json';
+import { Address, http } from "viem";
 import { privateKeyToAccount } from 'viem/accounts';
-import { ethers } from 'ethers';
+import { createViemAccount, generateCryptographicKey, createSignerForSign } from '../../lib/sl';
 
+// Ensure that the network chain matches the bundler's expectations.
+// The bundler URL below uses chain id 84532—override the baseSepolia chain id accordingly.
+const chain = { ...baseSepolia, id: 84532 };
 
+const BICONOMY_BUNDLER_URL =
+  "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
+const CONTRACT_ADDRESS = "0x7961d826258946969fa0d80b34508094c6148bdf";
+const OWNER_PRIVATE_KEY =
+  "0x1439f4ea306e7a2ed953a1f7e948614c2b3a8d62ae034b50d9b4ba3f51124c03";
 
-const CounterAbi = [
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "newCounter",
-				"type": "uint256"
-			}
-		],
-		"name": "Incremented",
-		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "counter",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "increment",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	}
-] as const satisfies Abi;
+// Both the grant and redemption flows expect the same selector.
+// According to the test code and docs this should be "0x273ea3e3" for the increment() function.
+const INCREMENT_SELECTOR = "0x273ea3e3";
 
 export default function SessionPage() {
   const [mpcSigner, setMpcSigner] = useState<any>(null);
-  const [sessionData, setSessionData] = useState<string | null>(null);
+  const [sessionDetails, setSessionDetails] = useState<any>(null);
   const [loading, setLoading] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
+ const [nexusAccountAddress, setNexusAccountAddress] = useState<Address>();
 
-  // Initialize MPC Signer: generate keys (if needed) and then create the signer for signing
+
+  // Initialize MPC Signer
   const initializeMPCSigner = async () => {
     setLoading('Initializing MPC signer...');
     try {
-      // Generate key pair (this will store config in localStorage)
       await generateCryptographicKey();
-      // Create a NetworkSigner using EphAuth for signing operations
       const { networkSigner, keyId, publicKey } = await createSignerForSign();
       const mpcAccount = createViemAccount(networkSigner, keyId, publicKey);
       setMpcSigner(mpcAccount);
@@ -80,98 +49,55 @@ export default function SessionPage() {
     }
   };
 
-  // Create Biconomy Smart Session
+  // Create Smart Session (grant permission)
   const createSmartSession = async () => {
     if (!mpcSigner) return;
     setLoading('Creating smart session...');
-
     try {
-      // Initialize Nexus client with owner account
-      const ownerPrivateKey = "0x1439f4ea306e7a2ed953a1f7e948614c2b3a8d62ae034b50d9b4ba3f51124c03"; // Replace with actual owner key
-      const ownerAccount = privateKeyToAccount(ownerPrivateKey);
-
-      const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
-      const ownerAccountAddress = ownerAccount.address;
-      console.log("Owner Account:", ownerAccountAddress);
-      const nexusClient = await createSmartAccountClient({
-        account: await toNexusAccount({
-          signer: ownerAccount,
-          chain: baseSepolia,
-          transport: http(),
-        }),
-        transport: http(bundlerUrl),
-      });
-      console.log("Nexus Client:", nexusClient.account.address);
-
-      // Create and install sessions module
-      const sessionsModule = toSmartSessionsValidator({
-        account: nexusClient.account,
-        signer: ownerAccount
-      });
-      console.log("Sessions Module:", sessionsModule.moduleInitData);
-
-      const hash = await nexusClient.installModule({
-        module: sessionsModule.moduleInitData
-      });
-      console.log("Module Installation Hash:", hash);
-
+      // Initialize owner account using the provided private key.
+      const ownerAccount = privateKeyToAccount(OWNER_PRIVATE_KEY);
       
-    const { success: installSuccess } = await nexusClient.waitForUserOperationReceipt({ hash });
 
-    if (!installSuccess) {
-        console.error("❌ Failed to install Smart Sessions module");
-        return;
-    }
-
-    console.log("✅ Smart Sessions module installed successfully");
-
-      const nexusSessionClient = nexusClient.extend(smartSessionCreateActions(sessionsModule));
-
-      // Create session with MPC public key
-      // In createSmartSession()
-      const sessionRequestedInfo: CreateSessionDataParams[] = [
-        {
-          sessionPublicKey: mpcSigner.address as `0x${string}`, // ✅ Correct property
-          actionPoliciesInfo: [{
-            contractAddress: "0x7961d826258946969fa0d80b34508094c6148bdf" as `0x${string}`,
-            abi : CounterAbi,
-            sudo: true 
-          }]
-        }
-      ];
-      console.log("sessionRequestedInfo:", sessionRequestedInfo);
-      console.log("MPC Session Public Key:", mpcSigner.address);
-      console.log("Session Public Key in Policy:", sessionRequestedInfo[0].sessionPublicKey);
-
-      const createSessionsResponse = await nexusSessionClient.grantPermission({
-        sessionRequestedInfo
+      // Create a Nexus account for the owner.
+      // Note: ensure that the transport RPC URL is correct; here we use the default http() for the RPC.
+      const nexusAccount = await toNexusAccount({
+        signer: ownerAccount,
+        chain, // our overridden chain with id: 84532
+        transport: http("https://base-sepolia.g.alchemy.com/v2/71BtTS_ke_J_XJg8P2LtjAGZuDKOQUJD"), 
       });
-      const { success } = await nexusClient.waitForUserOperationReceipt({
-        hash: createSessionsResponse.userOpHash
-    });
 
-    if (!success) {
-        console.error("❌ Failed to create Smart Session");
-        return;
-    }
+      setNexusAccountAddress(await nexusAccount.getAddress());
 
-    console.log("✅ Smart Session created successfully");
 
-      // Store session data in localStorage for persistence
-      const sessionData = {
-        granter: nexusClient.account.address,
-        sessionPublicKey: mpcSigner.address,
-        moduleData: {
-          permissionIds: createSessionsResponse.permissionIds, // ✅ Ensure these are included
-          action: createSessionsResponse.action,
-          mode: SmartSessionMode.USE,
-          sessions: createSessionsResponse.sessions
-        }
-      };
+      // Create the Nexus client using the bundler URL.
+      const nexusClient = createSmartAccountClient({
+        account: nexusAccount,
+        transport: http(BICONOMY_BUNDLER_URL),
+      });
 
-      const compressedData = stringify(sessionData);
-      localStorage.setItem('mpcSessionData', compressedData);
-      setSessionData(compressedData);
+      // Install the Smart Sessions module.
+      const smartSessionsModule = toSmartSessionsModule({ signer: ownerAccount });
+      const installHash = await nexusClient.installModule({ module: smartSessionsModule });
+      const { success: installSuccess } = await nexusClient.waitForUserOperationReceipt({ hash: installHash });
+
+      if (!installSuccess) {
+        throw new Error("Module installation failed");
+      }
+
+      // Extend client with Smart Sessions actions and grant permission,
+      // using the hardcoded function selector for the increment() function.
+      const smartSessionsClient = nexusClient.extend(smartSessionActions());
+      const sessionDetails = await smartSessionsClient.grantPermission({
+        redeemer: mpcSigner.address, // MPC signer is the redeemer.
+        actions: [{
+          actionTarget: CONTRACT_ADDRESS,
+          actionTargetSelector: INCREMENT_SELECTOR, // Hardcoded selector.
+          actionPolicies: [getSudoPolicy()]
+        }]
+      });
+
+      console.log('Permission granted:', sessionDetails);
+      setSessionDetails(sessionDetails);
       setLoading('');
     } catch (error) {
       console.error('Session Creation Error:', error);
@@ -179,53 +105,44 @@ export default function SessionPage() {
     }
   };
 
-  // Execute Transaction with MPC Session
+  // Execute Transaction (redeem permission)
   const executeTransaction = async () => {
-    if (!sessionData) return;
+    if (!sessionDetails) return;
     setLoading('Executing transaction...');
-
     try {
-      const parsedData = parse(sessionData);
-      const bundlerUrl = "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
-
-      // Create MPC-powered client
-      console.log("Creating MPC-powered client...");
-      const smartSessionClient = createSmartAccountClient({
-        chain: baseSepolia,
-        account: await toNexusAccount({
-          accountAddress: parsedData.granter,
-          signer: mpcSigner,
-          chain: baseSepolia,
-          transport: http(),
-        }),
-        transport: http(bundlerUrl)
-      });
-
-      // Attach sessions module
-      console.log("Attaching sessions module...");
-      const usePermissionsModule = toSmartSessionsValidator({
-        account: smartSessionClient.account,
+      // Create an emulated (redeemer) account using the Nexus account address from the session,
+      // and using the MPC signer as the redeemer key.
+      const emulatedAccount = await toNexusAccount({
+        accountAddress: nexusAccountAddress, // Use original address
         signer: mpcSigner,
-        moduleData: parsedData.moduleData
+        chain,
+        transport: http("https://base-sepolia.g.alchemy.com/v2/71BtTS_ke_J_XJg8P2LtjAGZuDKOQUJD"),
       });
 
-      const sessionEnabledClient = smartSessionClient.extend(
-        smartSessionUseActions(usePermissionsModule)
-      );
+      // Create the smart account client with mock mode enabled to simulate gas estimation.
+      const emulatedClient = createSmartAccountClient({
+        account: emulatedAccount,
+        transport: http(BICONOMY_BUNDLER_URL),
+      });
 
-      // Execute transaction (example: calling 'increment')
-      console.log("Executing transaction...");
-      const userOpHash = await sessionEnabledClient.usePermission({
+      // Extend the client with Smart Sessions actions and redeem the permission.
+      // Note that we use the hardcoded selector for the call data.
+      const smartSessionsClient = emulatedClient.extend(smartSessionActions());
+      const userOpHash = await smartSessionsClient.usePermission({
+        sessionDetails,
         calls: [{
-          to: "0x7961d826258946969fa0d80b34508094c6148bdf",
-          data: encodeFunctionData({
-            abi: CounterAbi,
-            functionName: "increment"
-          })
-        }]
-
+          to: CONTRACT_ADDRESS,
+          data: INCREMENT_SELECTOR, // Matching the permission's selector.
+        }],
+        mode: "ENABLE_AND_USE" // For the first usage.
       });
 
+      // Wait for the transaction to process.
+      const receipt = await emulatedClient.waitForUserOperationReceipt({ hash: userOpHash });
+      if (!receipt.success) {
+        throw new Error("Smart sessions module validation failed");
+      }
+      console.log("Transaction executed successfully, receipt:", receipt);
       setTxHash(userOpHash);
       setLoading('');
     } catch (error) {
@@ -237,7 +154,6 @@ export default function SessionPage() {
   return (
     <div className="min-h-screen p-8">
       <h1 className="text-3xl mb-8">MPC-Powered Smart Sessions</h1>
-
       <div className="space-y-4 max-w-2xl">
         <button
           onClick={initializeMPCSigner}
@@ -251,17 +167,14 @@ export default function SessionPage() {
           <button
             onClick={createSmartSession}
             className="btn-secondary"
-            disabled={!!sessionData}
+            disabled={!!sessionDetails}
           >
-            {sessionData ? 'Session Created' : 'Create Smart Session'}
+            {sessionDetails ? 'Session Created' : 'Create Smart Session'}
           </button>
         )}
 
-        {sessionData && (
-          <button
-            onClick={executeTransaction}
-            className="btn-success"
-          >
+        {sessionDetails && (
+          <button onClick={executeTransaction} className="btn-success">
             Execute Transaction
           </button>
         )}
@@ -274,12 +187,8 @@ export default function SessionPage() {
         )}
 
         <div className="mt-8 space-y-2">
-          {mpcSigner && (
-            <p>MPC Signer Address: {mpcSigner.address}</p>
-          )}
-          {sessionData && (
-            <p>Session Granter: {parse(sessionData).granter}</p>
-          )}
+          {mpcSigner && <p>MPC Signer Address: {mpcSigner.address}</p>}
+          {sessionDetails && <p>Granter Address: {sessionDetails.nexusAccountAddress}</p>}
         </div>
       </div>
     </div>
