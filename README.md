@@ -91,4 +91,5 @@ Users can send simple commands like "send 0.1 ETH to 0xABC..." to initiate trans
 - [Biconomy AbstractJS Documentation](https://docs.biconomy.io/docs/category/abstractjs)
 - [Viem Documentation](https://viem.sh/)
 - [Base Sepolia Testnet](https://docs.base.org/guides/build-with-base/network-information/)
+- [For more details check SL documentation](https://docs.silencelaboratories.com/silent-shard-network-mpc-tss-avs/6qFeKkGD4YVu6YYlr0pQ/start-here/the-network-functionality/a-session-key-experience-with-account-abstraction-and-silent-network) 
 
