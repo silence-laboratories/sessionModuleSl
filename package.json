@@ -13,9 +13,12 @@
     "@rhinestone/module-sdk": "^0.2.7",
     "@silencelaboratories/walletprovider-sdk": "^0.4.1",
     "ethers": "^6.13.5",
+    "lucide-react": "^0.487.0",
     "next": "15.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-slick": "^0.30.3",
+    "slick-carousel": "^1.8.1",
     "uuid": "^11.0.5",
     "viem": "^2.23.1"
   },
@@ -23,6 +26,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-slick": "^0.23.13",
     "typescript": "^5"
   }
 }

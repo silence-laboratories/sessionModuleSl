@@ -22,6 +22,9 @@ import {
   createSignerForSign,
 } from "../../lib/sl";
 import { privateKeyToAccount } from "viem/accounts";
+import Slider from "react-slick";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
 // --- Constants --- //
 const chain = { ...baseSepolia, id: 84532 };
@@ -40,6 +43,35 @@ const ERC20_TOKEN_ADDRESS: Address =
 // --- Agent/Backend Configuration --- //
 const AGENT_ID = "aa0d6f50-b80b-0dfa-811b-1f8750ee6278";
 const ELIZA_MESSAGE_URL = `http://localhost:3000/${AGENT_ID}/message`;
+
+// Add these styles at the top of the file
+const carouselSettings = {
+  dots: true,
+  infinite: true,
+  speed: 500,
+  slidesToShow: 1,
+  slidesToScroll: 1,
+  autoplay: true,
+  autoplaySpeed: 3000,
+};
+
+const carouselItems = [
+  {
+    title: "Secure MPC Transactions",
+    description: "Experience secure multi-party computation for your blockchain transactions",
+    icon: "🔒",
+  },
+  {
+    title: "Smart Session Management",
+    description: "Create and manage smart sessions with ease",
+    icon: "⚡",
+  },
+  {
+    title: "Real-time Chat Interface",
+    description: "Communicate with your backend in real-time",
+    icon: "💬",
+  },
+];
 
 export default function SessionPage() {
   // Core states
@@ -67,7 +99,7 @@ export default function SessionPage() {
     setLoading("Initializing MPC Signer...");
     try {
       // First, generate the full cryptographic key configuration.
-      // This returns both the keyConfig and a NetworkSigner instance (which we won’t store directly).
+      // This returns both the keyConfig and a NetworkSigner instance (which we won't store directly).
       const { keyConfig: newKeyConfig } = await generateCryptographicKey();
       // Save the key configuration so the backend can reconstruct the MPC signer.
       setKeyConfig(newKeyConfig);
@@ -137,13 +169,6 @@ export default function SessionPage() {
     }
   };
 
-  // --- Download Session File ---
-  // This function creates a JSON file containing:
-  // - Session details
-  // - MPC signer info
-  // - Key generation data (from createSignerForSign)
-  // - Full key configuration (from generateCryptographicKey)
-  // - Nexus Account Address and owner account as needed.
   const downloadSessionFile = () => {
     if (!sessionDetails || !mpcSigner || !keygenData || !keyConfig) return;
     const sessionData = {
@@ -214,89 +239,110 @@ export default function SessionPage() {
   };
 
   return (
-    <div className="min-h-screen p-8 font-mono bg-gray-50">
-      <h1 className="text-3xl font-bold mb-6">
-        MPC-Powered Smart Session: Transaction Orchestration
-      </h1>
+    <div className="min-h-screen p-8 font-mono bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+          MPC-Powered Smart Session: Transaction Orchestration
+        </h1>
 
-      <div className="space-y-6 max-w-xl">
-        {/* --- MPC and Session Creation Section --- */}
-        <div className="p-4 bg-white shadow rounded">
-          <button
-            onClick={initializeMPCSigner}
-            disabled={!!mpcSigner}
-            className="px-4 py-2 bg-blue-600 text-white rounded w-full mb-4"
-          >
-            {mpcSigner ? "✅ MPC Signer Ready" : "Initialize MPC Signer"}
-          </button>
-
-          {mpcSigner && (
+        <div className="space-y-8">
+          {/* --- MPC and Session Creation Section --- */}
+          <div className="p-6 bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-xl">
             <button
-              onClick={createSmartSession}
-              disabled={!!sessionDetails}
-              className="px-4 py-2 bg-purple-600 text-white rounded w-full mb-4"
+              onClick={initializeMPCSigner}
+              disabled={!!mpcSigner}
+              className={`px-6 py-3 rounded-lg w-full mb-4 transition-all duration-300 ${
+                mpcSigner
+                  ? "bg-green-500 text-white cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transform hover:-translate-y-1"
+              }`}
             >
-              {sessionDetails ? "✅ Session Created" : "Create Smart Session"}
+              {mpcSigner ? "✅ MPC Signer Ready" : "Initialize MPC Signer"}
             </button>
+
+            {mpcSigner && (
+              <button
+                onClick={createSmartSession}
+                disabled={!!sessionDetails}
+                className={`px-6 py-3 rounded-lg w-full mb-4 transition-all duration-300 ${
+                  sessionDetails
+                    ? "bg-green-500 text-white cursor-not-allowed"
+                    : "bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 transform hover:-translate-y-1"
+                }`}
+              >
+                {sessionDetails ? "✅ Session Created" : "Create Smart Session"}
+              </button>
+            )}
+
+            {sessionDetails && (
+              <>
+                <button
+                  onClick={downloadSessionFile}
+                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg w-full mb-4 transition-all duration-300 hover:from-green-600 hover:to-green-700 transform hover:-translate-y-1"
+                >
+                  Download Session Info
+                </button>
+                <p className="text-sm text-gray-600 dark:text-gray-300 text-center">
+                  This file contains the session info, MPC signer data, key generation details, and full key configuration required for backend processing.
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* --- Chat Window Section --- */}
+          {sessionDownloaded && (
+            <div className="p-6 bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700">
+              <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">💬 Chat with Backend</h2>
+              {/* Chat log area */}
+              <div className="border border-gray-200 dark:border-gray-700 p-4 h-96 overflow-y-auto mb-6 rounded-lg bg-gray-50 dark:bg-gray-900">
+                {chatLog.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">No messages yet. Start a conversation!</p>
+                ) : (
+                  chatLog.map((entry, index) => (
+                    <div
+                      key={index}
+                      className={`mb-4 p-3 rounded-lg max-w-[80%] ${
+                        entry.sender === "user"
+                          ? "bg-blue-500 text-white ml-auto"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white"
+                      }`}
+                    >
+                      <span className="font-semibold">
+                        {entry.sender === "user" ? "You:" : "Backend:"}
+                      </span>{" "}
+                      <span>{entry.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Chat input area */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder='Type a message, e.g. "send 0.00001 to 0xABC..."'
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  className="flex-grow p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                />
+                <button
+                  onClick={sendChatMessage}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg transition-all duration-300 hover:from-blue-600 hover:to-blue-700 transform hover:-translate-y-1"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
           )}
 
-          {sessionDetails && (
-            <>
-              <button
-                onClick={downloadSessionFile}
-                className="px-4 py-2 bg-green-600 text-white rounded w-full mb-2"
-              >
-                Download Session Info
-              </button>
-              <p className="text-sm text-gray-500">
-                This file contains the session info, MPC signer data, key generation details, and full key configuration required for backend processing.
-              </p>
-            </>
+          {/* --- Loading Status --- */}
+          {loading && (
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+              <p className="text-blue-500 font-medium mt-2">{loading}</p>
+            </div>
           )}
         </div>
-
-        {/* --- Chat Window Section --- */}
-        {sessionDownloaded && (
-          <div className="p-4 bg-white shadow rounded">
-            <h2 className="text-xl font-bold mb-4">💬 Chat with Backend</h2>
-            {/* Chat log area */}
-            <div className="border p-2 h-48 overflow-y-auto mb-4 rounded bg-gray-100">
-              {chatLog.length === 0 ? (
-                <p className="text-gray-500">No messages yet.</p>
-              ) : (
-                chatLog.map((entry, index) => (
-                  <div key={index} className="mb-2">
-                    <span className="font-semibold">
-                      {entry.sender === "user" ? "You:" : "Backend:"}
-                    </span>{" "}
-                    <span>{entry.message}</span>
-                  </div>
-                ))
-              )}
-            </div>
-            {/* Chat input area */}
-            <div className="flex">
-              <input
-                type="text"
-                placeholder='Type a message, e.g. "send 0.00001 to 0xABC..."'
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                className="flex-grow p-2 border rounded-l"
-              />
-              <button
-                onClick={sendChatMessage}
-                className="px-4 py-2 bg-blue-600 text-white rounded-r"
-              >
-                Send
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* --- Loading Status --- */}
-        {loading && (
-          <p className="text-blue-500 text-center font-medium">{loading}</p>
-        )}
       </div>
     </div>
   );
