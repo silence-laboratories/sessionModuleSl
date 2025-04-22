@@ -1,4 +1,4 @@
- MPC Session Demo
+### MPC Session Demo
 
 ## Overview
 
@@ -6,7 +6,6 @@ This demo showcases a secure wallet implementation using Multi-Party Computation
 
 1. Create a cryptographic MPC signer using Silence Labs SDK
 2. Set up a Smart Session using Biconomy's AbstractJS
-3. Stream session data to a backend agent(ElizaOs)
 4. Execute transactions through natural language commands
 
 ## Architecture
