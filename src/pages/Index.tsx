@@ -19,6 +19,8 @@ import {
   generateCryptographicKey,
   createSignerForSign,
 } from "@/lib/sl";
+import { connectMetaMask } from "@/lib/metamask";
+
 import { privateKeyToAccount } from "viem/accounts";
 import { SessionHeader } from "@/components/SessionHeader";
 import { SessionSetup } from "@/components/SessionSetup";
@@ -55,6 +57,8 @@ export default function Index() {
   const [nexusAccountAddress, setNexusAccountAddress] = useState<Address>();
   const [ownerAccount, setOwnerAccount] = useState<any>(null);
   const [loading, setLoading] = useState<string>("");
+  const [metaMaskAccount, setMetaMaskAccount] = useState<Address>();
+
   // Flag to show that the session file has been downloaded and chat UI unlocked.
   const [sessionDownloaded, setSessionDownloaded] = useState<boolean>(false);
 
@@ -93,24 +97,25 @@ export default function Index() {
   const createSmartSession = async () => {
     setLoading("Creating Smart Session...");
     try {
-      const owner = privateKeyToAccount(OWNER_PRIVATE_KEY);
-      setOwnerAccount(owner);
+      const { address } = await connectMetaMask();
+      setMetaMaskAccount(address);
 
       const nexusAccount = await toNexusAccount({
-        signer: owner,
+        signer: {address},
         chain,
         transport: http(ALCHEMY_RPC),
       });
 
-      const address = await nexusAccount.getAddress();
-      setNexusAccountAddress(address);
+      const nexusAddress = await nexusAccount.getAddress();
+      setNexusAccountAddress(nexusAddress);
+
 
       const nexusClient = createSmartAccountClient({
         account: nexusAccount,
         transport: http(BICONOMY_BUNDLER_URL),
       });
 
-      const smartModule = toSmartSessionsModule({ signer: owner });
+      const smartModule = toSmartSessionsModule({ signer: { address } }); // Use the MetaMask address
       const installHash = await nexusClient.installModule({ module: smartModule });
 
       const receipt = await nexusClient.waitForUserOperationReceipt({
@@ -155,8 +160,8 @@ export default function Index() {
       keygenData, // includes keyId and publicKey
       keyConfig,  // additional info: ephemeralKeyId, ephemeralPrivateKey, signerAddress, etc.
       nexusAccountAddress,
-      ownerAccount, // Include if needed by backend
-    };
+      metaMaskAccount
+      };
 
     const jsonString = JSON.stringify(
       sessionData,
