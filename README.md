@@ -1,4 +1,4 @@
-### MPC Session Demo
+### ElizaOS x silence network Session Demo
 
 ## Overview
 
