@@ -97,25 +97,24 @@ export default function Index() {
   const createSmartSession = async () => {
     setLoading("Creating Smart Session...");
     try {
-      const { address } = await connectMetaMask();
-      setMetaMaskAccount(address);
+      const owner = privateKeyToAccount(OWNER_PRIVATE_KEY);
+      setOwnerAccount(owner);
 
       const nexusAccount = await toNexusAccount({
-        signer: {address},
+        signer: owner,
         chain,
         transport: http(ALCHEMY_RPC),
       });
 
-      const nexusAddress = await nexusAccount.getAddress();
-      setNexusAccountAddress(nexusAddress);
-
+      const address = await nexusAccount.getAddress();
+      setNexusAccountAddress(address);
 
       const nexusClient = createSmartAccountClient({
         account: nexusAccount,
         transport: http(BICONOMY_BUNDLER_URL),
       });
 
-      const smartModule = toSmartSessionsModule({ signer: { address } }); // Use the MetaMask address
+      const smartModule = toSmartSessionsModule({ signer: owner });
       const installHash = await nexusClient.installModule({ module: smartModule });
 
       const receipt = await nexusClient.waitForUserOperationReceipt({
@@ -160,8 +159,8 @@ export default function Index() {
       keygenData, // includes keyId and publicKey
       keyConfig,  // additional info: ephemeralKeyId, ephemeralPrivateKey, signerAddress, etc.
       nexusAccountAddress,
-      metaMaskAccount
-      };
+      ownerAccount, // Include if needed by backend
+    };
 
     const jsonString = JSON.stringify(
       sessionData,
