@@ -18,7 +18,8 @@ import {
   SignRequestBuilder,
   EphAuth,
   computeAddress,
-  SignResponse
+  SignResponse,
+  TypedData
 } from "@silencelaboratories/walletprovider-sdk";
 import {
   bytesToHex,
@@ -32,36 +33,36 @@ import {
   Hex
 } from "viem";
 import { BrowserWallet } from "./browserWallet";
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
-/** Minimal cluster config */
+import { ApiVersion } from "@silencelaboratories/walletprovider-sdk";
+
 const clusterConfig = {
   walletProviderId: "WalletProvider",
-  walletProviderUrl: "ws://34.118.117.249", // or your cluster
-  apiVersion: "v1",
+  walletProviderUrl: "ws://34.118.117.249", // Replace with `wss://...` if secure
+  apiVersion: "v1" as ApiVersion,
 };
 
 const THRESHOLD = 2;
 const PARTIES_NUMBER = 3;
 
-/** Key config shape stored in localStorage */
 export interface KeyConfiguration {
   publicKey: string;
   keyId: string;
   ephemeralKeyId: string;
-  ephemeralPrivateKey: string; // hex (no "0x")
+  ephemeralPrivateKey: string;
   signerAddress: string;
   t: number;
   n: number;
   sessionAddress: string;
 }
 
-/** Save/load config */
 export function saveKeyConfig(cfg: KeyConfiguration) {
   localStorage.setItem("keyConfig", JSON.stringify(cfg));
-}
-export function loadKeyConfig(): KeyConfiguration | null {
-  const raw = localStorage.getItem("keyConfig");
-  return raw ? JSON.parse(raw) : null;
 }
 
 function hexToBytesNo0x(hex: string): Uint8Array {
@@ -73,49 +74,71 @@ function hexToBytesNo0x(hex: string): Uint8Array {
   return out;
 }
 
-/**
- * generateCryptographicKey()
- * 1) EOAAuth with a local "demo" private key (for simplicity).
- * 2) Silence Labs keygen => store KeyConfiguration in localStorage.
- */
+export function loadKeyConfig(): KeyConfiguration | null {
+  const cfg = localStorage.getItem("keyConfig");
+  if (!cfg) return null;
+  try {
+    const parsed = JSON.parse(cfg);
+    if (parsed && typeof parsed === "object") {
+      return parsed as KeyConfiguration;
+    }
+  }
+  catch (e) {
+    console.error("Failed to parse key config:", e);
+  }
+  return null;
+}
+
 export async function generateCryptographicKey(): Promise<{
   keyConfig: KeyConfiguration;
   eoaNetworkSigner: NetworkSigner;
 }> {
-  // For demonstration only – in production, use a real user wallet
-  const demoWalletPrivKey =
-    "0x6b17d0ae446c070ce14b12990cc10f5fcf89d3410277abea6f00352535502393";
-  const browserWallet = new BrowserWallet(demoWalletPrivKey);
-  const account = privateKeyToAccount(demoWalletPrivKey);
-  const ownerAddress = account.address;
+  if (!window.ethereum) throw new Error("MetaMask is not available");
 
-  // Create ephemeral key for multi-round signing
+  const [ownerAddress] = await window.ethereum.request({ method: "eth_requestAccounts" });
+  if (!ownerAddress) throw new Error("No account found in MetaMask");
+
+  // Ephemeral key pair (used only for current session)
   const signAlg = "secp256k1";
   const ephemeralPrivKey = generateEphPrivateKey(signAlg);
   const ephemeralPubKey = getEphPublicKey(ephemeralPrivKey, signAlg);
   const ephemeralId = uuidv4();
-  const ephClaim = new EphKeyClaim(ephemeralId, ephemeralPubKey, signAlg, 60 * 60);
+
+  const ephClaim = new EphKeyClaim(ephemeralId, ephemeralPubKey, signAlg, 3600); // 1hr TTL
+
+  // Use MetaMask for signing the auth message
+  const browserWallet = {
+    async signMessage(data: Uint8Array): Promise<Uint8Array> {
+      const hexMsg = `0x${Buffer.from(data).toString("hex")}`;
+      const signature = await window.ethereum.request({
+        method: "personal_sign",
+        params: [hexMsg, ownerAddress],
+      });
+
+      // Signature is 0x{r}{s}{v}, decode it to Uint8Array
+      return Buffer.from(signature.slice(2), "hex");
+    },
+
+    async signTypedData<T>(from: string, request: TypedData<T>): Promise<unknown> {
+      const signature = await window.ethereum.request({
+        method: "eth_signTypedData_v4",
+        params: [from, JSON.stringify(request)],
+      });
+
+      return signature;
+    },
+  };
 
   const eoaAuth = new EOAAuth(ownerAddress, browserWallet, { ephClaim });
-  const wpClient = new WalletProviderServiceClient({
-    walletProviderId: clusterConfig.walletProviderId,
-    walletProviderUrl: clusterConfig.walletProviderUrl,
-    apiVersion: "v1",
-  });
+  const wpClient = new WalletProviderServiceClient(clusterConfig);
 
-  const eoaNetworkSigner = new NetworkSigner(
-    wpClient,
-    THRESHOLD,
-    PARTIES_NUMBER,
-    eoaAuth
-  );
-  const keygenResp = await eoaNetworkSigner.generateKey([signAlg]);
-  const [primaryKey] = keygenResp;
-  primaryKey.keyId = String(primaryKey.keyId);
+  const eoaNetworkSigner = new NetworkSigner(wpClient, THRESHOLD, PARTIES_NUMBER, eoaAuth);
+
+  const [primaryKey] = await eoaNetworkSigner.generateKey([signAlg]);
 
   const keyConfig: KeyConfiguration = {
     publicKey: primaryKey.publicKey,
-    keyId: primaryKey.keyId,
+    keyId: String(primaryKey.keyId),
     ephemeralKeyId: ephemeralId,
     ephemeralPrivateKey: Buffer.from(ephemeralPrivKey).toString("hex"),
     signerAddress: ownerAddress,
@@ -127,7 +150,6 @@ export async function generateCryptographicKey(): Promise<{
   saveKeyConfig(keyConfig);
   return { keyConfig, eoaNetworkSigner };
 }
-
 /**
  * createSignerForSign()
  * Re-hydrates the ephemeral key & returns a NetworkSigner
