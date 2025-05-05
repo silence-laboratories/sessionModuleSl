@@ -53,7 +53,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     <div className="session-card">
       <div className="flex items-center gap-2 mb-4">
         <Bot className="h-5 w-5 text-blockchain-purple" />
-        <h2 className="text-lg font-semibold">Chat with Backend</h2>
+        <h2 className="text-lg font-semibold">Chat with your Personal AI agent</h2>
       </div>
       
       {/* Chat Messages */}
@@ -89,11 +89,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 }`}
               >
                 {entry.sender === 'backend' && entry.message.startsWith('{') ? (
-                  <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                  <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono">
                     {formatMessage(entry.message)}
                   </pre>
                 ) : (
-                  <p>{entry.message}</p>
+                  <p className="break-all whitespace-pre-wrap">{entry.message}</p>
                 )}
               </div>
               

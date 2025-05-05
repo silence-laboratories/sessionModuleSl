@@ -26,13 +26,16 @@ The application consists of:
 The process starts with initializing an MPC signer, which uses thresholded distributed key generation to create a session signer. This signer is responsible for signing transactions without exposing the real private key.
 
 ### 2. Smart Session Creation
-A Smart Session is created using Biconomy's AbstractJS, granting limited permissions to the MPC signer to execute specific transactions (in this case, ERC20 transfers).
+• Creates a Nexus account via MetaMask sign-in.
+• Pops up the fund-me address for 60 s → you deposit 0.002 ETH.
+• Installs Smart-Session module & signs a permission granting the MPC signer transfer() rights on the demo ERC-20 token.
 
-### 3. Session Data Downloading
-The session information is downloaded from the frontend. This includes the session ID and the necessary cryptographic data to reconstruct the signer from elizaOS backend.
+### 3. Upload Session Data
+Front-end bundles everything (sessionDetails, keyConfig, etc.) into one object called sessionInfo and POSTs it to
+POST /api/session with the header x-user-id: <stable-UUID-per-keyId>.
 
 ### 4. Natural Language Transaction Execution
-Users can send simple commands like "send 0.1 ETH to 0xABC..." to initiate transactions. The backend parses these commands, reconstructs the MPC signer, and executes the transaction using the pre-authorized session.
+Users can send simple commands like "send 0.1 ETH to 0xABC..." to initiate transactions. The Eliza OS backend parses these commands, reconstructs the MPC signer, and executes the transaction using the pre-authorized session.
 
 ## Security Features
 
@@ -67,9 +70,11 @@ Users can send simple commands like "send 0.1 ETH to 0xABC..." to initiate trans
 
 1. Click "Initialize MPC Signer" to set up the cryptographic infrastructure
 2. Click "Create Smart Session" to establish session permissions
-3. Click "Download session info" to download the session data
-4. chat window will open, where you can enter commands like "send 0.1 ETH to 0xABC..."
-5. The backend will process the command, reconstruct the MPC
+3. Click "upload session info" to upload the session data to the backend
+4. Click "Fund me" to deposit of atleast 0.002 ETH into the session account
+5. Follow "proceed to chat" to chat window
+6. chat window will open, where you can enter commands like "send 0.1 ETH to 0xABC..."
+7. The Eliza OS backend will process the command, reconstruct the MPC
 
 ## Technical Stack
 
@@ -79,6 +84,7 @@ Users can send simple commands like "send 0.1 ETH to 0xABC..." to initiate trans
   - Viem for blockchain interactions
 - **Cryptography**: Silence Labs SDK for MPC key generation and signing
 - **Backend**: Eliza OS agent for command processing
+- **Session-store-backend**: Store session data and key configurations
 
 ## Important Notes
 

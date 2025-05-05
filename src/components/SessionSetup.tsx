@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Check, Download, Shield, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
+import { Check, Upload, Shield, KeyRound, Loader2, ArrowDown } from 'lucide-react';
 import { StatusBadge } from './ui/StatusBadge';
 
 type SessionSetupProps = {
@@ -119,19 +119,19 @@ const SessionSetup: React.FC<SessionSetupProps> = ({
         <div className={`flex flex-col md:flex-row gap-4 items-start md:items-center justify-between ${!sessionDetails ? 'opacity-50' : ''}`}>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${sessionDetails ? 'bg-green-600' : 'bg-gray-300'} text-white text-sm font-medium`}>
+            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${sessionDetails ? 'bg-green-600' : 'bg-gray-300'} text-white text-sm font-medium}`}>
                 3
               </span>
-              <h3 className="font-medium text-gray-900">Download Session Info</h3>
+              <h3 className="font-medium text-gray-900">Send Data to Backend</h3>
               {getStepStatus(3) !== 'idle' && (
                 <StatusBadge 
                   status={getStepStatus(3)}
-                  successText="Downloaded"
+                  successText="Sent"
                 />
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-1 ml-8">
-              Download the session file required for backend processing
+              Send session data required for backend processing
             </p>
           </div>
           <button
@@ -142,9 +142,9 @@ const SessionSetup: React.FC<SessionSetupProps> = ({
             {getStepStatus(3) === 'success' ? (
               <Check className="h-4 w-4" />
             ) : (
-              <Download className="h-4 w-4" />
+              <Upload className="h-4 w-4" />
             )}
-            Download File
+            Upload Session Data
           </button>
         </div>
         
@@ -153,7 +153,7 @@ const SessionSetup: React.FC<SessionSetupProps> = ({
           <div className="mt-4 flex items-center justify-center">
             <div className="flex flex-col items-center gap-1 text-blockchain-purple">
               <p className="text-sm font-medium">Proceed to Chat Interface</p>
-              <ArrowRight className="h-5 w-5 animate-bounce-horizontal" />
+              <ArrowDown className="h-5 w-5 animate-bounce-horizontal" />
             </div>
           </div>
         )}
@@ -162,7 +162,7 @@ const SessionSetup: React.FC<SessionSetupProps> = ({
         {sessionDetails && (
           <div className="mt-2 text-xs text-muted-foreground">
             <p>
-              The session file contains the session info, MPC signer data, key generation details, 
+              The session data contains the session info, MPC signer data, key generation details, 
               and full key configuration required for backend processing.
             </p>
           </div>
