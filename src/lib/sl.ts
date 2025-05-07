@@ -43,7 +43,7 @@ import { ApiVersion } from "@silencelaboratories/walletprovider-sdk";
 
 const clusterConfig = {
   walletProviderId: "WalletProvider",
-  walletProviderUrl: "ws://34.118.117.249", // Replace with `wss://...` if secure
+  walletProviderUrl: "wss://34.118.117.249",
   apiVersion: "v1" as ApiVersion,
 };
 

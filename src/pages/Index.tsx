@@ -30,7 +30,7 @@ const BICONOMY_BUNDLER_URL =
 const ERC20_TOKEN_ADDRESS: Address =
   "0x03AA93e006fBa956cdBAfa2b8EF789D0Cb63e7b4";
 
-const SESSION_STORE_URL = "http://localhost:3008/api/session";
+const SESSION_STORE_URL = "https://sessionstoreservice.demo.silencelaboratories.com/api/session";
 const AGENT_ID = "aa0d6f50-b80b-0dfa-811b-1f8750ee6278";
 const ELIZA_MESSAGE_URL = `http://localhost:3000/${AGENT_ID}/message`;
 
