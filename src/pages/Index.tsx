@@ -1,7 +1,4 @@
-/* pages/index.tsx
-   MPC signer → Smart Session → auto-upload → chat
-*/
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   createSmartAccountClient,
   toNexusAccount,
@@ -21,20 +18,17 @@ import { SessionSetup } from "@/components/SessionSetup";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Loader2, X } from "lucide-react";
 
-/* ---------- constants ---------- */
 const chain = { ...baseSepolia, id: 84532 };
-const ALCHEMY_RPC =
-  "https://base-sepolia.g.alchemy.com/v2/71BtTS_ke_J_XJg8P2LtjAGZuDKOQUJD";
-const BICONOMY_BUNDLER_URL =
-  "https://bundler.biconomy.io/api/v3/84532/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
-const ERC20_TOKEN_ADDRESS: Address =
-  "0x03AA93e006fBa956cdBAfa2b8EF789D0Cb63e7b4";
+const ALCHEMY_RPC = import.meta.env.VITE_ALCHEMY_RPC;
+const BICONOMY_BUNDLER_URL = import.meta.env.VITE_BICONOMY_BUNDLER_URL;
+const ERC20_TOKEN_ADDRESS: Address = import.meta.env
+  .VITE_ERC20_TOKEN_ADDRESS as Address;
 
-const SESSION_STORE_URL = "https://sessionstoreservice.demo.silencelaboratories.com/api/session";
+const SESSION_STORE_URL =
+  "https://sessionstoreservice.demo.silencelaboratories.com/api/session";
 const AGENT_ID = "aa0d6f50-b80b-0dfa-811b-1f8750ee6278";
 const ELIZA_MESSAGE_URL = `http://localhost:3000/${AGENT_ID}/message`;
 
-/* UUID helper */
 const uuidForKey = (keyId: string) => {
   const key = `session_user_id_${keyId}`;
   let id = localStorage.getItem(key);
@@ -59,22 +53,19 @@ export default function Index() {
   const [loading, setLoading] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  /* fund popup */
   const [showFundPopup, setShowFundPopup] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] =
     useState<Address | null>(null);
 
   const sessionPhaseRef = useRef<any>(null); // to resume after funding
 
-  /* chat */
   const [sessionUploaded, setSessionUploaded] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatLog, setChatLog] = useState<{ sender: string; message: string }[]>(
-    [],
+    []
   );
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
-  /* ── 1. init signer ───────────────────────────────── */
   const initializeMPCSigner = async () => {
     setLoading("Initializing MPC Signer…");
     try {
@@ -95,7 +86,6 @@ export default function Index() {
     }
   };
 
-  /* ── 2. phase-1 (prompt funding) ──────────────────── */
   const createSmartSession = async () => {
     if (showFundPopup) return;
     setLoading("Creating Smart Session…");
@@ -129,7 +119,6 @@ export default function Index() {
     }
   };
 
-  /* ── 3. phase-2 (after funding) + upload ───────────── */
   const resumeSmartSession = async () => {
     if (!sessionPhaseRef.current) return;
     setLoading("Finalising Smart Session…");
@@ -141,8 +130,12 @@ export default function Index() {
       });
 
       const smartModule = toSmartSessionsModule({ signer: owner });
-      const installHash = await nexusClient.installModule({ module: smartModule });
-      const rec = await nexusClient.waitForUserOperationReceipt({ hash: installHash });
+      const installHash = await nexusClient.installModule({
+        module: smartModule,
+      });
+      const rec = await nexusClient.waitForUserOperationReceipt({
+        hash: installHash,
+      });
       if (!rec.success) throw new Error("Module installation failed");
 
       const sessionClient = nexusClient.extend(smartSessionActions());
@@ -158,7 +151,7 @@ export default function Index() {
       });
       setSessionDetails(session);
 
-      await uploadSessionInfo(session);          // ← auto-sync
+      await uploadSessionInfo(session); // ← auto-sync
       setToast("✓ Session data synced with backend");
     } catch (e) {
       console.error(e);
@@ -173,7 +166,6 @@ export default function Index() {
     if (!showFundPopup && sessionPhaseRef.current) resumeSmartSession();
   }, [showFundPopup]);
 
-  /* ── upload helper ─────────────────────────────────── */
   const uploadSessionInfo = async (freshSession: any) => {
     if (!freshSession || !keygenData || !keyConfig || !mpcSigner) return;
 
@@ -200,14 +192,13 @@ export default function Index() {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-user-id": userId },
       body: JSON.stringify(payload, (_, v) =>
-        typeof v === "bigint" ? v.toString() : v,
+        typeof v === "bigint" ? v.toString() : v
       ),
     });
     if (!res.ok) throw new Error(await res.text());
     setSessionUploaded(true);
   };
 
-  /* ── pretty print backend responses ───────────────── */
   const formatMessage = (d: any): string => {
     if (typeof d === "string") return d;
 
@@ -230,7 +221,6 @@ export default function Index() {
     return typeof d === "object" ? JSON.stringify(d, null, 2) : String(d);
   };
 
-  /* ── chat send ────────────────────────────────────── */
   const sendChatMessage = async () => {
     if (!chatInput.trim()) return;
 
@@ -239,7 +229,6 @@ export default function Index() {
     setIsSendingMessage(true);
 
     try {
-      /* optimistic retry upload if it failed earlier */
       if (!sessionUploaded) {
         try {
           await uploadSessionInfo(sessionDetails);
@@ -273,7 +262,6 @@ export default function Index() {
     }
   };
 
-  /* ── UI ───────────────────────────────────────────── */
   return (
     <div className="min-h-screen px-4 py-12 md:px-8 bg-background">
       <div className="max-w-4xl mx-auto">

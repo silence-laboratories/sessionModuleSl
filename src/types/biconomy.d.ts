@@ -1,7 +1,3 @@
-
-// Type declarations for @biconomy/abstractjs
-// This is a simplified version just to make TypeScript happy during development
-
 declare module '@biconomy/abstractjs' {
   import { Address } from 'viem';
   

@@ -1,12 +1,8 @@
-// lib/sl.ts
-
 import { v4 as uuidv4 } from "uuid";
 import { Buffer } from 'buffer/';
 import {
   LocalAccount,
-  privateKeyToAccount,
   toAccount,
-  publicKeyToAddress
 } from "viem/accounts";
 import {
   WalletProviderServiceClient,
@@ -24,7 +20,6 @@ import {
 import {
   bytesToHex,
   stringToHex,
-  hexToBytes,
   keccak256,
   serializeSignature,
   serializeTransaction,
@@ -43,7 +38,7 @@ import { ApiVersion } from "@silencelaboratories/walletprovider-sdk";
 
 const clusterConfig = {
   walletProviderId: "WalletProvider",
-  walletProviderUrl: "wss://34.118.117.249",
+  walletProviderUrl: "https://wpbe-internal-silent-network.silencelaboratories.com",
   apiVersion: "v1" as ApiVersion,
 };
 
@@ -98,7 +93,6 @@ export async function generateCryptographicKey(): Promise<{
   const [ownerAddress] = await window.ethereum.request({ method: "eth_requestAccounts" });
   if (!ownerAddress) throw new Error("No account found in MetaMask");
 
-  // Ephemeral key pair (used only for current session)
   const signAlg = "secp256k1";
   const ephemeralPrivKey = generateEphPrivateKey(signAlg);
   const ephemeralPubKey = getEphPublicKey(ephemeralPrivKey, signAlg);
@@ -106,7 +100,6 @@ export async function generateCryptographicKey(): Promise<{
 
   const ephClaim = new EphKeyClaim(ephemeralId, ephemeralPubKey, signAlg, 3600); // 1hr TTL
 
-  // Use MetaMask for signing the auth message
   const browserWallet = {
     async signMessage(data: Uint8Array): Promise<Uint8Array> {
       const hexMsg = `0x${Buffer.from(data).toString("hex")}`;
@@ -115,7 +108,6 @@ export async function generateCryptographicKey(): Promise<{
         params: [hexMsg, ownerAddress],
       });
 
-      // Signature is 0x{r}{s}{v}, decode it to Uint8Array
       return Buffer.from(signature.slice(2), "hex");
     },
 
@@ -217,7 +209,6 @@ export function createViemAccount(
       return res;
     },
 
-    // B) signTransaction: same approach -> raw ecdsa of keccak(rlp)
     async signTransaction(tx, args) {
       console.log("MPC signTransaction:", tx);
 
@@ -227,7 +218,6 @@ export function createViemAccount(
         : tx;
 
       const txHash = keccak256(serializer(signableTx));
-      // sign raw 32 bytes
       const signReq = new SignRequestBuilder()
         .setRequest(address, txHash.slice(2), "rawBytes")
         .build();
@@ -239,7 +229,6 @@ export function createViemAccount(
       return serializer(tx, sig);
     },
 
-    // C) signTypedData: If your aggregator doesn't handle EIP712, this might fail on chain.
     async signTypedData(typedData) {
       console.log("MPC signTypedData:", typedData);
       const dataHash = hashTypedData(typedData);
@@ -257,7 +246,6 @@ export function createViemAccount(
   });
 }
 
-// Utility: convert any message into a 0x-string
 function normalizeToHex(msg: string | Uint8Array | { raw: string | Uint8Array }): `0x${string}` {
   if (typeof msg === "string") {
     return msg.startsWith("0x")
