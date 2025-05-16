@@ -26,8 +26,26 @@ const ERC20_TOKEN_ADDRESS: Address = import.meta.env
 
 const SESSION_STORE_URL =
   "https://sessionstoreservice.demo.silencelaboratories.com/api/session";
-const AGENT_ID = "aa0d6f50-b80b-0dfa-811b-1f8750ee6278";
-const ELIZA_MESSAGE_URL = `http://localhost:3000/${AGENT_ID}/message`;
+
+
+
+const AGENT_ID = await fetch("https://elizasi.demo.silencelaboratories.com/agents")
+    .then((response) => response.json())
+    .then((data) => data.agents[0]?.id)
+    .catch((error) => {
+        console.error("Error fetching agent ID:", error);
+        return null;
+    });
+
+if (AGENT_ID) {
+    console.log("Agent ID:", AGENT_ID);
+} else {
+    console.log("No agents found");
+}
+
+console.log("AGENT_ID", AGENT_ID);
+const ELIZA_MESSAGE_URL = `https://elizasi.demo.silencelaboratories.com/${AGENT_ID}/message`;
+console.log("ELIZA_MESSAGE_URL", ELIZA_MESSAGE_URL);
 
 const uuidForKey = (keyId: string) => {
   const key = `session_user_id_${keyId}`;
