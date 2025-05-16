@@ -28,24 +28,26 @@ const SESSION_STORE_URL =
   "https://sessionstoreservice.demo.silencelaboratories.com/api/session";
 
 
+let AGENT_ID: string | null = null;
+let ELIZA_MESSAGE_URL: string | null = null;
 
-const AGENT_ID = await fetch("https://elizasi.demo.silencelaboratories.com/agents")
-    .then((response) => response.json())
-    .then((data) => data.agents[0]?.id)
-    .catch((error) => {
-        console.error("Error fetching agent ID:", error);
-        return null;
-    });
-
-if (AGENT_ID) {
-    console.log("Agent ID:", AGENT_ID);
-} else {
-    console.log("No agents found");
-}
-
-console.log("AGENT_ID", AGENT_ID);
-const ELIZA_MESSAGE_URL = `https://elizasi.demo.silencelaboratories.com/${AGENT_ID}/message`;
-console.log("ELIZA_MESSAGE_URL", ELIZA_MESSAGE_URL);
+(async () => {
+  try {
+    const response = await fetch("https://elizasi.demo.silencelaboratories.com/agents");
+    const data = await response.json();
+    AGENT_ID = data.agents[0]?.id || null;
+    
+    if (AGENT_ID) {
+      console.log("Agent ID:", AGENT_ID);
+      ELIZA_MESSAGE_URL = `https://elizasi.demo.silencelaboratories.com/${AGENT_ID}/message`;
+      console.log("ELIZA_MESSAGE_URL", ELIZA_MESSAGE_URL);
+    } else {
+      console.log("No agents found");
+    }
+  } catch (error) {
+    console.error("Error fetching agent ID:", error);
+  }
+})();
 
 const uuidForKey = (keyId: string) => {
   const key = `session_user_id_${keyId}`;
