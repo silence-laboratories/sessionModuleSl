@@ -321,7 +321,7 @@ export default function Index() {
                 <X className="h-4 w-4" />
               </button>
 
-              <h2 className="text-xl font-bold">⚠️ Fund Required</h2>
+              <h2 className="text-xl font-bold">⚠️ Fund Required[Base Sepolia]</h2>
               <p>
                 Send at least <strong>0.002 ETH</strong> to:
               </p>

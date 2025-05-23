@@ -31,12 +31,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [chatLog]);
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendChatMessage();
-    }
-  };
+      const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendChatMessage();
+          setChatInput('');        // ← clear immediately
+        }
+      };
 
   const formatMessage = (message: string): string => {
     try {
